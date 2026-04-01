@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   StatusBar,
   ScrollView,
+  Image,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -37,7 +38,11 @@ export default function LoginScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <MaterialCommunityIcons name="bus-clock" size={52} color={colors.white} />
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
           </View>
           <Text style={styles.appName}>TransferLog</Text>
           <Text style={styles.appSubtitle}>Gestión de turnos y vacaciones</Text>
@@ -141,15 +146,22 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.25)',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  logo: {
+    width: 110,
+    height: 110,
   },
   appName: {
     fontSize: typography.sizes.xxxl,
