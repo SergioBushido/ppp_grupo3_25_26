@@ -29,6 +29,7 @@ import { getVacationsByEmployee, getAllVacations } from '../database/vacationSer
 import { ShiftBadge, getShiftConfig } from '../components/ShiftBadge';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { SafeAreaView } from "react-native-safe-area-context"
 
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
@@ -138,21 +139,27 @@ export default function CalendarScreen() {
     <ScrollView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Calendario</Text>
-        <View style={styles.viewToggle}>
-          <TouchableOpacity
-            style={[styles.toggleBtn, viewMode === 'weekly' && styles.toggleBtnActive]}
-            onPress={() => setViewMode('weekly')}
-          >
-            <Text style={[styles.toggleText, viewMode === 'weekly' && styles.toggleTextActive]}>Semana</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, viewMode === 'monthly' && styles.toggleBtnActive]}
-            onPress={() => setViewMode('monthly')}
-          >
-            <Text style={[styles.toggleText, viewMode === 'monthly' && styles.toggleTextActive]}>Mes</Text>
-          </TouchableOpacity>
-        </View>
+        <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+          <View style={{flexDirection: "row", justifyContent: "space-between"}}>
+            <Text style={styles.headerTitle}>Calendario</Text>
+            <View style={styles.viewToggle}>
+
+              <TouchableOpacity
+                style={[styles.toggleBtn, viewMode === 'weekly' && styles.toggleBtnActive]}
+                onPress={() => setViewMode('weekly')}
+              >
+                <Text style={[styles.toggleText, viewMode === 'weekly' && styles.toggleTextActive]}>Semana</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleBtn, viewMode === 'monthly' && styles.toggleBtnActive]}
+                onPress={() => setViewMode('monthly')}
+              >
+                <Text style={[styles.toggleText, viewMode === 'monthly' && styles.toggleTextActive]}>Mes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </SafeAreaView>
+
       </View>
 
       {/* Month navigation */}
@@ -249,11 +256,8 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.primary,
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 10,
     paddingBottom: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   headerTitle: {
     fontSize: typography.sizes.xl,

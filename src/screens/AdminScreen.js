@@ -21,6 +21,7 @@ import { VacationCard } from '../components/VacationCard';
 import { ShiftBadge } from '../components/ShiftBadge';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const TABS = [
   { key: 'requests', label: 'Solicitudes', icon: 'inbox' },
@@ -111,11 +112,13 @@ export default function AdminScreen() {
   const handleDeleteShift = async (shift) => {
     Alert.alert('Eliminar turno', `¿Eliminar turno de ${shift.employee_name}?`, [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: async () => {
-        const { deleteShift } = await import('../database/shiftService');
-        await deleteShift(shift.id);
-        await loadDayShifts();
-      }},
+      {
+        text: 'Eliminar', style: 'destructive', onPress: async () => {
+          const { deleteShift } = await import('../database/shiftService');
+          await deleteShift(shift.id);
+          await loadDayShifts();
+        }
+      },
     ]);
   };
 
@@ -137,8 +140,12 @@ export default function AdminScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <MaterialCommunityIcons name="shield-crown" size={22} color={colors.accent} />
-        <Text style={styles.headerTitle}>Panel de Administración</Text>
+        <SafeAreaView edges={['top']}>
+          <View style={{flexDirection: "row", alignItems: "center", gap: 10}}>
+            <MaterialCommunityIcons name="shield-crown" size={22} color={colors.accent} />
+            <Text style={styles.headerTitle}>Panel de Administración</Text>
+          </View>
+        </SafeAreaView>
       </View>
 
       {/* Tabs */}

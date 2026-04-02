@@ -14,6 +14,7 @@ import { getVacationsByEmployee, deleteVacation } from '../database/vacationServ
 import { VacationCard } from '../components/VacationCard';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { SafeAreaView } from "react-native-safe-area-context"
 
 export default function VacationsScreen({ navigation }) {
   const { user, refreshUser } = useAuth();
@@ -58,23 +59,25 @@ export default function VacationsScreen({ navigation }) {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mis Vacaciones</Text>
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{user.available_days}</Text>
-            <Text style={styles.statLabel}>Días disponibles</Text>
+        <SafeAreaView edges={['top']}>
+          <Text style={styles.headerTitle}>Mis Vacaciones</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{user.available_days}</Text>
+              <Text style={styles.statLabel}>Días disponibles</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{approvedCount}</Text>
+              <Text style={styles.statLabel}>Aprobadas</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{pendingCount}</Text>
+              <Text style={styles.statLabel}>Pendientes</Text>
+            </View>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{approvedCount}</Text>
-            <Text style={styles.statLabel}>Aprobadas</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{pendingCount}</Text>
-            <Text style={styles.statLabel}>Pendientes</Text>
-          </View>
-        </View>
+        </SafeAreaView>
       </View>
 
       {/* List */}
@@ -122,7 +125,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 24,
+    paddingBottom: 20
+  
   },
   headerTitle: {
     fontSize: typography.sizes.xl,
@@ -135,7 +139,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 16,
     paddingVertical: 16,
-    paddingHorizontal: 12,
+  
   },
   statItem: {
     flex: 1,

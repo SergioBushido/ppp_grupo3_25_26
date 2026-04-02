@@ -16,6 +16,8 @@ import { getUpcomingVacationsForEmployee } from '../database/vacationService';
 import { ShiftBadge } from '../components/ShiftBadge';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { useSafeAreaInsets, SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
+
 
 export default function HomeScreen({ navigation }) {
   const { user, logout, refreshUser } = useAuth();
@@ -62,17 +64,23 @@ export default function HomeScreen({ navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.greeting}>{greeting},</Text>
-            <Text style={styles.userName}>{firstName} 👋</Text>
-          </View>
-          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-            <MaterialCommunityIcons name="logout" size={20} color={colors.white} />
-          </TouchableOpacity>
+          <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+            <View style={styles.headerStyle}>
+              <View>
+                <Text style={styles.greeting}>{greeting},</Text>
+                <Text style={styles.userName}>{firstName} 👋</Text>
+                <Text style={styles.dateText}>
+                  {format(today, "EEEE, d 'de' MMMM yyyy", { locale: es })}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+                <MaterialCommunityIcons name="logout" size={28} color={colors.white} />
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+
         </View>
-        <Text style={styles.dateText}>
-          {format(today, "EEEE, d 'de' MMMM yyyy", { locale: es })}
-        </Text>
+
         {user?.role === 'admin' && (
           <View style={styles.adminBadge}>
             <MaterialCommunityIcons name="shield-crown" size={13} color={colors.accent} />
@@ -80,6 +88,8 @@ export default function HomeScreen({ navigation }) {
           </View>
         )}
       </View>
+
+
 
       {/* Today Shift */}
       <View style={styles.section}>
@@ -182,20 +192,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  content: {
-    paddingBottom: 32,
-  },
   header: {
     backgroundColor: colors.primary,
+    paddingBottom: 20,
+    shadowColor: "black",
     paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   headerTop: {
     flexDirection: 'row',
+    alignItems: "center",
+  },
+  headerStyle: {
+    flexDirection: 'row',
+    alignItems: "center",
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
   },
   greeting: {
     fontSize: typography.sizes.md,
@@ -207,10 +222,8 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   logoutBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    // borderRadius: 12,    
+    // backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },

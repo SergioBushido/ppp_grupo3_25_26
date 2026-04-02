@@ -13,12 +13,14 @@ import AdminScreen from '../screens/AdminScreen';
 
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { useSafeAreaInsets, SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function MainTabs() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
@@ -28,13 +30,14 @@ function MainTabs() {
           backgroundColor: colors.white,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 6,
+          height: 60 + insets.bottom,  
+          paddingBottom: insets.bottom, 
+          paddingTop: 5,
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
+
           fontSize: typography.sizes.xs,
           fontWeight: typography.weights.semibold,
         },
@@ -82,6 +85,7 @@ function MainTabs() {
           }}
         />
       )}
+
     </Tab.Navigator>
   );
 }

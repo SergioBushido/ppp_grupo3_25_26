@@ -6,6 +6,7 @@ import { initDatabase } from './src/database/database';
 import { AuthProvider } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { colors } from './src/theme/colors';
+import { SafeAreaProvider } from "react-native-safe-area-context"
 
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
@@ -30,9 +31,11 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
-        <NavigationContainer>
-          <AppNavigator />
-        </NavigationContainer>
+        <SafeAreaProvider>
+          <NavigationContainer>
+            <AppNavigator />
+          </NavigationContainer>
+        </SafeAreaProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );
