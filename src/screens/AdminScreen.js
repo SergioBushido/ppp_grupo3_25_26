@@ -15,7 +15,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations } from '../database/vacationService';
-import { getAllEmployees, updateAvailableDays } from '../database/employeeService';
+import { getAllEmployees, updateAvailableDays, createEmployee } from '../database/employeeService';
 import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate } from '../database/shiftService';
 import { VacationCard } from '../components/VacationCard';
 import { ShiftBadge } from '../components/ShiftBadge';
@@ -52,6 +52,13 @@ export default function AdminScreen() {
   const [daysModalVisible, setDaysModalVisible] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [newDays, setNewDays] = useState('');
+
+  // Add employee modal
+  const [addEmpModalVisible, setAddEmpModalVisible] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [newInitialDays, setNewInitialDays] = useState('22');
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -131,6 +138,37 @@ export default function AdminScreen() {
     await updateAvailableDays(editingEmployee.id, d);
     await loadAll();
     setDaysModalVisible(false);
+  };
+
+  const handleCreateEmployee = async () => {
+    if (!newName || !newEmail || !newPass) {
+      Alert.alert('Error', 'Por favor, rellena todos los campos.');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      await createEmployee({
+        name: newName,
+        email: newEmail,
+        password: newPass,
+        available_days: parseInt(newInitialDays, 10) || 22
+      });
+      
+      Alert.alert('✅ Éxito', `Empleado ${newName} creado correctamente.`);
+      setAddEmpModalVisible(false);
+      // Reset form
+      setNewName('');
+      setNewEmail('');
+      setNewPass('');
+      setNewInitialDays('22');
+      
+      await loadAll();
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo crear el empleado. Verifica si el email ya existe.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -249,30 +287,41 @@ export default function AdminScreen() {
 
           {/* Employees Tab */}
           {activeTab === 'employees' && (
-            <FlatList
-              data={employees}
-              keyExtractor={(item) => String(item.id)}
-              contentContainerStyle={styles.listContent}
-              renderItem={({ item }) => (
-                <View style={styles.empCard}>
-                  <View style={styles.empAvatar}>
-                    <Text style={styles.empAvatarText}>{item.name[0]}</Text>
+            <View style={{ flex: 1 }}>
+              <FlatList
+                data={employees}
+                keyExtractor={(item) => String(item.id)}
+                contentContainerStyle={styles.listContent}
+                renderItem={({ item }) => (
+                  <View style={styles.empCard}>
+                    <View style={styles.empAvatar}>
+                      <Text style={styles.empAvatarText}>{item.name[0]}</Text>
+                    </View>
+                    <View style={styles.empInfo}>
+                      <Text style={styles.empName}>{item.name}</Text>
+                      <Text style={styles.empEmail}>{item.email}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.daysChip}
+                      onPress={() => handleEditDays(item)}
+                    >
+                      <Text style={styles.daysChipNumber}>{item.available_days}</Text>
+                      <Text style={styles.daysChipLabel}>días</Text>
+                      <MaterialCommunityIcons name="pencil" size={12} color={colors.primary} />
+                    </TouchableOpacity>
                   </View>
-                  <View style={styles.empInfo}>
-                    <Text style={styles.empName}>{item.name}</Text>
-                    <Text style={styles.empEmail}>{item.email}</Text>
-                  </View>
+                )}
+                ListFooterComponent={
                   <TouchableOpacity
-                    style={styles.daysChip}
-                    onPress={() => handleEditDays(item)}
+                    style={styles.addShiftBtn}
+                    onPress={() => setAddEmpModalVisible(true)}
                   >
-                    <Text style={styles.daysChipNumber}>{item.available_days}</Text>
-                    <Text style={styles.daysChipLabel}>días</Text>
-                    <MaterialCommunityIcons name="pencil" size={12} color={colors.primary} />
+                    <MaterialCommunityIcons name="account-plus" size={18} color={colors.white} />
+                    <Text style={styles.addShiftBtnText}>Añadir nuevo empleado</Text>
                   </TouchableOpacity>
-                </View>
-              )}
-            />
+                }
+              />
+            </View>
           )}
         </>
       )}
@@ -353,6 +402,69 @@ export default function AdminScreen() {
                 <Text style={styles.modalConfirmText}>Guardar</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Employee Modal */}
+      <Modal visible={addEmpModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modal, { maxHeight: '90%' }]}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>Nuevo Empleado</Text>
+              <Text style={styles.modalSubtitle}>Crea un nuevo perfil de acceso</Text>
+
+              <Text style={styles.modalLabel}>Nombre Completo</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Ej. Carlos Martínez"
+                value={newName}
+                onChangeText={setNewName}
+              />
+
+              <Text style={styles.modalLabel}>Correo Electrónico</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="empleado@transferlog.com"
+                value={newEmail}
+                onChangeText={setNewEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+
+              <Text style={styles.modalLabel}>Contraseña Inicial</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Mínimo 6 caracteres"
+                value={newPass}
+                onChangeText={setNewPass}
+                secureTextEntry
+              />
+
+              <Text style={styles.modalLabel}>Días de Vacaciones (Anual)</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="22"
+                value={newInitialDays}
+                onChangeText={setNewInitialDays}
+                keyboardType="numeric"
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  style={styles.modalCancelBtn} 
+                  onPress={() => setAddEmpModalVisible(false)}
+                >
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.modalConfirmBtn} 
+                  onPress={handleCreateEmployee}
+                >
+                  <Text style={styles.modalConfirmText}>Crear Perfil</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -660,5 +772,16 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     borderRadius: 14,
     marginBottom: 8,
+  },
+  formInput: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: typography.sizes.sm,
+    color: colors.textPrimary,
+    marginBottom: 16,
   },
 });

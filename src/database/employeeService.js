@@ -1,46 +1,72 @@
-import { getDatabase } from './database';
+import { supabase } from '../lib/supabase';
 
 export async function getAllEmployees() {
-  const db = await getDatabase();
-  return await db.getAllAsync('SELECT * FROM employees ORDER BY name');
+  const { data, error } = await supabase
+    .from('employees')
+    .select('*')
+    .order('name');
+  
+  if (error) throw error;
+  return data;
 }
 
 export async function getEmployeeById(id) {
-  const db = await getDatabase();
-  return await db.getFirstAsync('SELECT * FROM employees WHERE id = ?', [id]);
+  const { data, error } = await supabase
+    .from('employees')
+    .select('*')
+    .eq('id', id)
+    .single();
+  
+  if (error) throw error;
+  return data;
 }
 
 export async function loginEmployee(email, password) {
-  const db = await getDatabase();
-  return await db.getFirstAsync(
-    'SELECT * FROM employees WHERE email = ? AND password = ?',
-    [email.toLowerCase().trim(), password]
-  );
+  const { data, error } = await supabase
+    .from('employees')
+    .select('*')
+    .eq('email', email.toLowerCase().trim())
+    .eq('password', password)
+    .single();
+  
+  if (error) return null; // Retornar null si no hay coincidencia (comportamiento previo)
+  return data;
 }
 
 export async function createEmployee({ name, email, password, role = 'employee', available_days = 22 }) {
-  const db = await getDatabase();
-  const result = await db.runAsync(
-    'INSERT INTO employees (name, email, password, role, available_days) VALUES (?, ?, ?, ?, ?)',
-    [name, email.toLowerCase().trim(), password, role, available_days]
-  );
-  return result.lastInsertRowId;
+  const { data, error } = await supabase
+    .from('employees')
+    .insert([{ name, email: email.toLowerCase().trim(), password, role, available_days }])
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data.id;
 }
 
 export async function updateEmployee(id, fields) {
-  const db = await getDatabase();
-  const keys = Object.keys(fields);
-  const values = Object.values(fields);
-  const setClause = keys.map((k) => `${k} = ?`).join(', ');
-  await db.runAsync(`UPDATE employees SET ${setClause} WHERE id = ?`, [...values, id]);
+  const { error } = await supabase
+    .from('employees')
+    .update(fields)
+    .eq('id', id);
+  
+  if (error) throw error;
 }
 
 export async function updateAvailableDays(employeeId, days) {
-  const db = await getDatabase();
-  await db.runAsync('UPDATE employees SET available_days = ? WHERE id = ?', [days, employeeId]);
+  const { error } = await supabase
+    .from('employees')
+    .update({ available_days: days })
+    .eq('id', employeeId);
+  
+  if (error) throw error;
 }
 
 export async function deleteEmployee(id) {
-  const db = await getDatabase();
-  await db.runAsync('DELETE FROM employees WHERE id = ?', [id]);
+  const { error } = await supabase
+    .from('employees')
+    .delete()
+    .eq('id', id);
+  
+  if (error) throw error;
 }

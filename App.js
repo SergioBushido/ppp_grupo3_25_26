@@ -1,3 +1,4 @@
+import 'react-native-url-polyfill/auto';
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -11,12 +12,13 @@ export default function App() {
   const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
-    initDatabase()
-      .then(() => setDbReady(true))
-      .catch((e) => {
-        console.error('DB init error:', e);
-        setDbReady(true); // Show app even if seed fails
-      });
+    // initDatabase()
+    //   .then(() => setDbReady(true))
+    //   .catch((e) => {
+    //     console.error('DB init error:', e);
+    //     setDbReady(true);
+    //   });
+    setDbReady(true); // SQLite ya no es necesario para el arranque
   }, []);
 
   if (!dbReady) {
