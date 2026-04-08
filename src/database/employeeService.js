@@ -70,3 +70,12 @@ export async function deleteEmployee(id) {
   
   if (error) throw error;
 }
+
+export async function changePassword(employeeId, newPassword) {
+  const { error } = await supabase
+    .from('employees')
+    .update({ password: newPassword })
+    .eq('id', employeeId);
+    
+  if (error) throw error;
+}

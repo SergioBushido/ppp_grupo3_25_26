@@ -6,6 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Alert,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
@@ -13,7 +16,7 @@ import { es } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
 import { getTodayShiftForEmployee, getShiftsByDate } from '../database/shiftService';
 import { getUpcomingVacationsForEmployee, getAllPendingVacations } from '../database/vacationService';
-import { getAllEmployees } from '../database/employeeService';
+import { getAllEmployees, changePassword } from '../database/employeeService';
 import { ShiftBadge } from '../components/ShiftBadge';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
@@ -28,6 +31,33 @@ export default function HomeScreen({ navigation }) {
     pendingRequests: 0,
     todayShifts: 0,
   });
+
+  // Change Password Modal
+  const [passModalVisible, setPassModalVisible] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const handlePasswordChange = async () => {
+    if (newPassword.length < 6) {
+      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'Las contraseñas no coinciden');
+      return;
+    }
+
+    try {
+      await changePassword(user.id, newPassword);
+      Alert.alert('Éxito', 'Tu contraseña ha sido actualizada');
+      setPassModalVisible(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo actualizar la contraseña');
+    }
+  };
+
 
   const today = new Date();
   const greeting = (() => {
@@ -225,8 +255,70 @@ export default function HomeScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* Preferences */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Preferencias</Text>
+            <TouchableOpacity
+              style={styles.profileActionRow}
+              onPress={() => setPassModalVisible(true)}
+            >
+              <View style={styles.profileActionIcon}>
+                <MaterialCommunityIcons name="lock-reset" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.profileActionInfo}>
+                <Text style={styles.profileActionTitle}>Cambiar contraseña</Text>
+                <Text style={styles.profileActionSub}>Actualiza tu clave de acceso</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
         </>
       )}
+
+      {/* Change Password Modal */}
+      <Modal visible={passModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Cambiar Contraseña</Text>
+            
+            <Text style={styles.modalLabel}>Nueva Contraseña</Text>
+            <TextInput
+              style={styles.modalInput}
+              secureTextEntry
+              value={newPassword}
+              onChangeText={setNewPassword}
+              placeholder="Mínimo 6 caracteres"
+            />
+            
+            <Text style={styles.modalLabel}>Confirmar Contraseña</Text>
+            <TextInput
+              style={styles.modalInput}
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="Repetir nueva contraseña"
+            />
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => {
+                  setPassModalVisible(false);
+                  setNewPassword('');
+                  setConfirmPassword('');
+                }}
+              >
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handlePasswordChange}>
+                <Text style={styles.modalConfirmText}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 }
@@ -485,5 +577,107 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: typography.weights.bold,
     fontSize: typography.sizes.md,
+  },
+  profileActionRow: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    marginTop: 8,
+  },
+  profileActionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  profileActionInfo: {
+    flex: 1,
+  },
+  profileActionTitle: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    color: colors.textPrimary,
+  },
+  profileActionSub: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+  },
+  modalTitle: {
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+    marginBottom: 20,
+  },
+  modalLabel: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    color: colors.textSecondary,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  modalInput: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: typography.sizes.sm,
+    color: colors.textPrimary,
+    marginBottom: 16,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+    color: colors.textSecondary,
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.white,
   },
 });
