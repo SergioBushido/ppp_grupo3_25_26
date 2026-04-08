@@ -12,11 +12,11 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { format, addDays } from 'date-fns';
+import { format, addDays, startOfMonth, endOfMonth, subMonths, addMonths, parseISO, differenceInCalendarDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations } from '../database/vacationService';
-import { getAllEmployees, updateAvailableDays, createEmployee } from '../database/employeeService';
-import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate } from '../database/shiftService';
+import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee } from '../database/employeeService';
+import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth } from '../database/shiftService';
 import { VacationCard } from '../components/VacationCard';
 import { ShiftBadge } from '../components/ShiftBadge';
 import { colors } from '../theme/colors';
@@ -26,6 +26,7 @@ const TABS = [
   { key: 'requests', label: 'Solicitudes', icon: 'inbox' },
   { key: 'shifts', label: 'Turnos', icon: 'calendar-edit' },
   { key: 'employees', label: 'Empleados', icon: 'account-group' },
+  { key: 'reports', label: 'Reportes', icon: 'chart-bar' },
 ];
 
 const SHIFT_OPTIONS = [
@@ -48,10 +49,12 @@ export default function AdminScreen() {
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [selectedShiftType, setSelectedShiftType] = useState('morning');
 
-  // Employee days modal
-  const [daysModalVisible, setDaysModalVisible] = useState(false);
+  // Employee edit modal
+  const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
-  const [newDays, setNewDays] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editDays, setEditDays] = useState('');
 
   // Add employee modal
   const [addEmpModalVisible, setAddEmpModalVisible] = useState(false);
@@ -59,6 +62,10 @@ export default function AdminScreen() {
   const [newEmail, setNewEmail] = useState('');
   const [newPass, setNewPass] = useState('');
   const [newInitialDays, setNewInitialDays] = useState('22');
+
+  // Reports
+  const [reportMonth, setReportMonth] = useState(new Date());
+  const [reportData, setReportData] = useState([]);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -79,8 +86,64 @@ export default function AdminScreen() {
     setDayShifts(s);
   }, [selectedDate]);
 
+  const loadReportData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const year = reportMonth.getFullYear();
+      const month = reportMonth.getMonth() + 1;
+      
+      const allEmps = await getAllEmployees();
+      const activeEmps = allEmps.filter(e => e.role === 'employee');
+      
+      const shiftsData = await getShiftsForMonth(year, month);
+      const allVacationsData = await getAllVacations();
+      
+      const data = activeEmps.map(emp => {
+        const empShifts = shiftsData.filter(s => s.employee_id === emp.id);
+        const morning = empShifts.filter(s => s.shift_type === 'morning').length;
+        const afternoon = empShifts.filter(s => s.shift_type === 'afternoon').length;
+        const night = empShifts.filter(s => s.shift_type === 'night').length;
+        
+        let vacDays = 0;
+        const mStart = startOfMonth(reportMonth);
+        const mEnd = endOfMonth(reportMonth);
+
+        allVacationsData.filter(v => v.employee_id === emp.id && v.status === 'approved').forEach(v => {
+          const start = parseISO(v.start_date);
+          const end = parseISO(v.end_date);
+          
+          let overlapStart = start > mStart ? start : mStart;
+          let overlapEnd = end < mEnd ? end : mEnd;
+          
+          if (overlapStart <= overlapEnd) {
+             vacDays += differenceInCalendarDays(overlapEnd, overlapStart) + 1;
+          }
+        });
+
+        return {
+          id: emp.id,
+          name: emp.name,
+          morning,
+          afternoon,
+          night,
+          vacations: vacDays,
+          totalShifts: empShifts.length
+        };
+      });
+      
+      setReportData(data);
+    } finally {
+      setLoading(false);
+    }
+  }, [reportMonth]);
+
   useEffect(() => { loadAll(); }, [loadAll]);
   useEffect(() => { loadDayShifts(); }, [loadDayShifts]);
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      loadReportData();
+    }
+  }, [activeTab, loadReportData]);
 
   const handleApprove = async (id) => {
     try {
@@ -126,18 +189,55 @@ export default function AdminScreen() {
     ]);
   };
 
-  const handleEditDays = (emp) => {
+  const handleEditEmployee = (emp) => {
     setEditingEmployee(emp);
-    setNewDays(String(emp.available_days));
-    setDaysModalVisible(true);
+    setEditName(emp.name);
+    setEditEmail(emp.email);
+    setEditDays(String(emp.available_days));
+    setEditModalVisible(true);
   };
 
-  const handleSaveDays = async () => {
-    const d = parseInt(newDays, 10);
-    if (isNaN(d) || d < 0) return;
-    await updateAvailableDays(editingEmployee.id, d);
-    await loadAll();
-    setDaysModalVisible(false);
+  const handleSaveEmployee = async () => {
+    const daysNum = parseInt(editDays, 10);
+    if (isNaN(daysNum) || daysNum < 0) {
+      Alert.alert('Error', 'Los días deben ser un número válido.');
+      return;
+    }
+    
+    try {
+      await updateEmployee(editingEmployee.id, {
+        name: editName,
+        email: editEmail,
+        available_days: daysNum
+      });
+      await loadAll();
+      setEditModalVisible(false);
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo actualizar el empleado.');
+    }
+  };
+
+  const handleDeleteEmployee = async () => {
+    Alert.alert(
+      'Eliminar Empleado',
+      `¿Estás seguro de que deseas eliminar a ${editingEmployee.name}? Esta acción es irreversible.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Eliminar', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              await deleteEmployee(editingEmployee.id);
+              await loadAll();
+              setEditModalVisible(false);
+            } catch (e) {
+              Alert.alert('Error', 'No se pudo eliminar el empleado.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleCreateEmployee = async () => {
@@ -303,7 +403,7 @@ export default function AdminScreen() {
                     </View>
                     <TouchableOpacity
                       style={styles.daysChip}
-                      onPress={() => handleEditDays(item)}
+                      onPress={() => handleEditEmployee(item)}
                     >
                       <Text style={styles.daysChipNumber}>{item.available_days}</Text>
                       <Text style={styles.daysChipLabel}>días</Text>
@@ -322,6 +422,66 @@ export default function AdminScreen() {
                 }
               />
             </View>
+          )}
+
+          {/* Reports Tab */}
+          {activeTab === 'reports' && (
+            <ScrollView contentContainerStyle={styles.listContent}>
+              <View style={styles.dateNav}>
+                <TouchableOpacity
+                  style={styles.dateNavBtn}
+                  onPress={() => setReportMonth(subMonths(reportMonth, 1))}
+                >
+                  <MaterialCommunityIcons name="chevron-left" size={22} color={colors.primary} />
+                </TouchableOpacity>
+                <Text style={styles.dateNavText}>
+                  {format(reportMonth, "MMMM yyyy", { locale: es }).replace(/^\w/, c => c.toUpperCase())}
+                </Text>
+                <TouchableOpacity
+                  style={styles.dateNavBtn}
+                  onPress={() => setReportMonth(addMonths(reportMonth, 1))}
+                >
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+
+              {reportData.length === 0 ? (
+                <View style={styles.empty}>
+                  <MaterialCommunityIcons name="text-box-search-outline" size={40} color={colors.textMuted} />
+                  <Text style={styles.emptyText}>Sin datos para este mes</Text>
+                </View>
+              ) : (
+                reportData.map((emp) => (
+                  <View key={emp.id} style={styles.reportCard}>
+                    <View style={styles.reportHeader}>
+                      <Text style={styles.reportEmpName}>{emp.name}</Text>
+                      <View style={styles.reportTotalBadge}>
+                        <Text style={styles.reportTotalText}>{emp.totalShifts} Turnos</Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.reportStatsRow}>
+                      <View style={styles.reportStat}>
+                        <MaterialCommunityIcons name="weather-sunny" size={16} color={colors.morning} />
+                        <Text style={styles.reportStatValue}>{emp.morning}</Text>
+                      </View>
+                      <View style={styles.reportStat}>
+                        <MaterialCommunityIcons name="weather-sunset" size={16} color={colors.afternoon} />
+                        <Text style={styles.reportStatValue}>{emp.afternoon}</Text>
+                      </View>
+                      <View style={styles.reportStat}>
+                        <MaterialCommunityIcons name="weather-night" size={16} color={colors.night} />
+                        <Text style={styles.reportStatValue}>{emp.night}</Text>
+                      </View>
+                      <View style={[styles.reportStat, { borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 8 }]}>
+                        <MaterialCommunityIcons name="beach" size={16} color={colors.vacation} />
+                        <Text style={[styles.reportStatValue, { color: colors.vacation }]}>{emp.vacations} d</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
           )}
         </>
       )}
@@ -381,25 +541,52 @@ export default function AdminScreen() {
         </View>
       </Modal>
 
-      {/* Edit Days Modal */}
-      <Modal visible={daysModalVisible} transparent animationType="fade">
+      {/* Edit Employee Modal */}
+      <Modal visible={editModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Días disponibles</Text>
+            <Text style={styles.modalTitle}>Editar Empleado</Text>
             <Text style={styles.modalSubtitle}>{editingEmployee?.name}</Text>
+            
+            <Text style={styles.modalLabel}>Nombre</Text>
+            <TextInput
+              style={styles.formInput}
+              value={editName}
+              onChangeText={setEditName}
+            />
+
+            <Text style={styles.modalLabel}>Email</Text>
+            <TextInput
+              style={styles.formInput}
+              value={editEmail}
+              onChangeText={setEditEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+
+            <Text style={styles.modalLabel}>Días de Vacaciones</Text>
             <TextInput
               style={styles.daysInput}
-              value={newDays}
-              onChangeText={setNewDays}
+              value={editDays}
+              onChangeText={setEditDays}
               keyboardType="numeric"
               maxLength={3}
             />
+
+            <TouchableOpacity 
+              style={styles.deleteLink} 
+              onPress={handleDeleteEmployee}
+            >
+              <MaterialCommunityIcons name="account-remove" size={16} color={colors.rejected} />
+              <Text style={styles.deleteLinkText}>Eliminar empleado</Text>
+            </TouchableOpacity>
+
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setDaysModalVisible(false)}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setEditModalVisible(false)}>
                 <Text style={styles.modalCancelText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSaveDays}>
-                <Text style={styles.modalConfirmText}>Guardar</Text>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSaveEmployee}>
+                <Text style={styles.modalConfirmText}>Guardar Cambios</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -784,4 +971,70 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: 16,
   },
+  deleteLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 8,
+  },
+  deleteLinkText: {
+    color: colors.rejected,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    textTransform: 'uppercase',
+  },
+  reportCard: {
+    backgroundColor: colors.white,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  reportHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.background,
+    paddingBottom: 12,
+  },
+  reportEmpName: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+  },
+  reportTotalBadge: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  reportTotalText: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    color: colors.primaryDark,
+  },
+  reportStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  reportStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  reportStatValue: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    color: colors.textSecondary,
+  },
 });
+

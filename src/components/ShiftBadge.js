@@ -7,21 +7,31 @@ import { typography } from '../theme/typography';
 const SHIFT_CONFIG = {
   morning: {
     label: 'Mañana',
+    short: 'M',
     icon: 'weather-sunny',
     bg: colors.morningLight,
     text: colors.morning,
   },
   afternoon: {
     label: 'Tarde',
-    icon: 'weather-sunset',
+    short: 'T',
+    icon: 'wrench',
     bg: colors.afternoonLight,
     text: colors.afternoon,
   },
   night: {
     label: 'Noche',
-    icon: 'weather-night',
+    short: 'N',
+    icon: 'wrench',
     bg: colors.nightLight,
     text: colors.night,
+  },
+  free: {
+    label: 'Libre',
+    short: 'L',
+    icon: 'home',
+    bg: colors.freeLight,
+    text: colors.free,
   },
 };
 

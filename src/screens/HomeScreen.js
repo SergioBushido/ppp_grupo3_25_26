@@ -11,8 +11,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
-import { getTodayShiftForEmployee } from '../database/shiftService';
-import { getUpcomingVacationsForEmployee } from '../database/vacationService';
+import { getTodayShiftForEmployee, getShiftsByDate } from '../database/shiftService';
+import { getUpcomingVacationsForEmployee, getAllPendingVacations } from '../database/vacationService';
+import { getAllEmployees } from '../database/employeeService';
 import { ShiftBadge } from '../components/ShiftBadge';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
@@ -22,6 +23,11 @@ export default function HomeScreen({ navigation }) {
   const [todayShift, setTodayShift] = useState(null);
   const [upcomingVacations, setUpcomingVacations] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [adminStats, setAdminStats] = useState({
+    employeesCount: 0,
+    pendingRequests: 0,
+    todayShifts: 0,
+  });
 
   const today = new Date();
   const greeting = (() => {
@@ -33,12 +39,31 @@ export default function HomeScreen({ navigation }) {
 
   const loadData = useCallback(async () => {
     if (!user) return;
-    const [shift, vacations] = await Promise.all([
-      getTodayShiftForEmployee(user.id),
-      getUpcomingVacationsForEmployee(user.id),
-    ]);
-    setTodayShift(shift);
-    setUpcomingVacations(vacations);
+    
+    if (user.role === 'admin') {
+      try {
+        const todayStr = format(today, 'yyyy-MM-dd');
+        const [emps, pending, shifts] = await Promise.all([
+          getAllEmployees(),
+          getAllPendingVacations(),
+          getShiftsByDate(todayStr),
+        ]);
+        setAdminStats({
+          employeesCount: emps.filter(e => e.role === 'employee').length,
+          pendingRequests: pending.length,
+          todayShifts: shifts.length,
+        });
+      } catch (error) {
+        console.error("Error loading admin stats:", error);
+      }
+    } else {
+      const [shift, vacations] = await Promise.all([
+        getTodayShiftForEmployee(user.id),
+        getUpcomingVacationsForEmployee(user.id),
+      ]);
+      setTodayShift(shift);
+      setUpcomingVacations(vacations);
+    }
   }, [user]);
 
   const onRefresh = useCallback(async () => {
@@ -81,98 +106,127 @@ export default function HomeScreen({ navigation }) {
         )}
       </View>
 
-      {/* Today Shift */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Turno de hoy</Text>
-        {todayShift ? (
-          <View style={styles.shiftCard}>
-            <ShiftBadge shiftType={todayShift.shift_type} />
-            {todayShift.notes ? (
-              <Text style={styles.shiftNotes}>{todayShift.notes}</Text>
-            ) : null}
-          </View>
-        ) : (
-          <View style={styles.emptyCard}>
-            <MaterialCommunityIcons name="calendar-remove" size={32} color={colors.textMuted} />
-            <Text style={styles.emptyText}>Sin turno asignado hoy</Text>
-          </View>
-        )}
-      </View>
+      {user?.role === 'admin' ? (
+        <View style={styles.adminDashboard}>
+          <Text style={styles.sectionTitle}>Estado de la Empresa</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <View style={[styles.statIcon, { backgroundColor: colors.primaryLight }]}>
+                <MaterialCommunityIcons name="account-group" size={24} color={colors.white} />
+              </View>
+              <Text style={styles.statNumber}>{adminStats.employeesCount}</Text>
+              <Text style={styles.statLabel}>Empleados</Text>
+            </View>
 
-      {/* Available Days */}
-      <View style={styles.daysCard}>
-        <View style={styles.daysInfo}>
-          <MaterialCommunityIcons name="umbrella-beach" size={28} color={colors.vacation} />
-          <View>
-            <Text style={styles.daysNumber}>{user?.available_days ?? 0}</Text>
-            <Text style={styles.daysLabel}>días de vacaciones disponibles</Text>
+            <View style={styles.statCard}>
+              <View style={[styles.statIcon, { backgroundColor: colors.vacation }]}>
+                <MaterialCommunityIcons name="inbox-arrow-down" size={24} color={colors.white} />
+              </View>
+              <Text style={styles.statNumber}>{adminStats.pendingRequests}</Text>
+              <Text style={styles.statLabel}>Pendientes</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={[styles.statIcon, { backgroundColor: colors.accent }]}>
+                <MaterialCommunityIcons name="calendar-clock" size={24} color={colors.white} />
+              </View>
+              <Text style={styles.statNumber}>{adminStats.todayShifts}</Text>
+              <Text style={styles.statLabel}>Turnos Hoy</Text>
+            </View>
           </View>
+
+          <TouchableOpacity
+            style={styles.adminActionBtn}
+            onPress={() => navigation.navigate('Admin')}
+          >
+            <MaterialCommunityIcons name="shield-crown" size={20} color={colors.white} />
+            <Text style={styles.adminActionBtnText}>Ir al Panel de Control</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.requestBtn}
-          onPress={() => navigation.navigate('RequestVacation')}
-        >
-          <MaterialCommunityIcons name="plus" size={16} color={colors.white} />
-          <Text style={styles.requestBtnText}>Solicitar</Text>
-        </TouchableOpacity>
-      </View>
+      ) : (
+        <>
+          {/* Today Shift */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Turno de hoy</Text>
+            {todayShift ? (
+              <View style={styles.shiftCard}>
+                <ShiftBadge shiftType={todayShift.shift_type} />
+                {todayShift.notes ? (
+                  <Text style={styles.shiftNotes}>{todayShift.notes}</Text>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.emptyCard}>
+                <MaterialCommunityIcons name="calendar-remove" size={32} color={colors.textMuted} />
+                <Text style={styles.emptyText}>Sin turno asignado hoy</Text>
+              </View>
+            )}
+          </View>
 
-      {/* Upcoming vacations */}
-      {upcomingVacations.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Próximas vacaciones</Text>
-          {upcomingVacations.map((v) => (
-            <View key={v.id} style={styles.upcomingCard}>
-              <MaterialCommunityIcons name="calendar-check" size={18} color={colors.vacation} />
-              <View style={styles.upcomingInfo}>
-                <Text style={styles.upcomingDates}>
-                  {format(parseISO(v.start_date), "d MMM", { locale: es })} →{' '}
-                  {format(parseISO(v.end_date), "d MMM yyyy", { locale: es })}
-                </Text>
-                {v.reason ? <Text style={styles.upcomingReason}>{v.reason}</Text> : null}
+          {/* Available Days */}
+          <View style={styles.daysCard}>
+            <View style={styles.daysInfo}>
+              <MaterialCommunityIcons name="umbrella-beach" size={28} color={colors.vacation} />
+              <View>
+                <Text style={styles.daysNumber}>{user?.available_days ?? 0}</Text>
+                <Text style={styles.daysLabel}>días de vacaciones disponibles</Text>
               </View>
             </View>
-          ))}
-        </View>
-      )}
-
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Acceso rápido</Text>
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.quickAction}
-            onPress={() => navigation.navigate('Calendar')}
-          >
-            <View style={[styles.quickIcon, { backgroundColor: colors.morningLight }]}>
-              <MaterialCommunityIcons name="calendar-month" size={24} color={colors.morning} />
-            </View>
-            <Text style={styles.quickLabel}>Calendario</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickAction}
-            onPress={() => navigation.navigate('Vacations')}
-          >
-            <View style={[styles.quickIcon, { backgroundColor: colors.vacationLight }]}>
-              <MaterialCommunityIcons name="beach" size={24} color={colors.vacation} />
-            </View>
-            <Text style={styles.quickLabel}>Vacaciones</Text>
-          </TouchableOpacity>
-
-          {user?.role === 'admin' && (
             <TouchableOpacity
-              style={styles.quickAction}
-              onPress={() => navigation.navigate('Admin')}
+              style={styles.requestBtn}
+              onPress={() => navigation.navigate('RequestVacation')}
             >
-              <View style={[styles.quickIcon, { backgroundColor: colors.nightLight }]}>
-                <MaterialCommunityIcons name="shield-crown" size={24} color={colors.night} />
-              </View>
-              <Text style={styles.quickLabel}>Admin</Text>
+              <MaterialCommunityIcons name="plus" size={16} color={colors.white} />
+              <Text style={styles.requestBtnText}>Solicitar</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Upcoming vacations */}
+          {upcomingVacations.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Próximas vacaciones</Text>
+              {upcomingVacations.map((v) => (
+                <View key={v.id} style={styles.upcomingCard}>
+                  <MaterialCommunityIcons name="calendar-check" size={18} color={colors.vacation} />
+                  <View style={styles.upcomingInfo}>
+                    <Text style={styles.upcomingDates}>
+                      {format(parseISO(v.start_date), "d MMM", { locale: es })} →{' '}
+                      {format(parseISO(v.end_date), "d MMM yyyy", { locale: es })}
+                    </Text>
+                    {v.reason ? <Text style={styles.upcomingReason}>{v.reason}</Text> : null}
+                  </View>
+                </View>
+              ))}
+            </View>
           )}
-        </View>
-      </View>
+
+          {/* Quick Actions */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Acceso rápido</Text>
+            <View style={styles.quickActions}>
+              <TouchableOpacity
+                style={styles.quickAction}
+                onPress={() => navigation.navigate('Calendar')}
+              >
+                <View style={[styles.quickIcon, { backgroundColor: colors.morningLight }]}>
+                  <MaterialCommunityIcons name="calendar-month" size={24} color={colors.morning} />
+                </View>
+                <Text style={styles.quickLabel}>Calendario</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickAction}
+                onPress={() => navigation.navigate('Vacations')}
+              >
+                <View style={[styles.quickIcon, { backgroundColor: colors.vacationLight }]}>
+                  <MaterialCommunityIcons name="beach" size={24} color={colors.vacation} />
+                </View>
+                <Text style={styles.quickLabel}>Vacaciones</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -376,5 +430,60 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     fontWeight: typography.weights.semibold,
     color: colors.textPrimary,
+  },
+  adminDashboard: {
+    paddingHorizontal: 20,
+    marginTop: 24,
+    gap: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderRadius: 18,
+    padding: 16,
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  statIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+  },
+  statLabel: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    fontWeight: typography.weights.bold,
+    textTransform: 'uppercase',
+  },
+  adminActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    paddingVertical: 16,
+    marginTop: 8,
+  },
+  adminActionBtnText: {
+    color: colors.white,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.md,
   },
 });

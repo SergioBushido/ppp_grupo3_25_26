@@ -54,9 +54,9 @@ function MainTabs() {
         name="Calendar"
         component={CalendarScreen}
         options={{
-          tabBarLabel: 'Calendario',
+          tabBarLabel: 'Horario',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="calendar-month" size={size} color={color} />
+            <MaterialCommunityIcons name="clock-outline" size={size} color={color} />
           ),
         }}
       />
@@ -66,7 +66,17 @@ function MainTabs() {
         options={{
           tabBarLabel: 'Vacaciones',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="beach" size={size} color={color} />
+            <MaterialCommunityIcons name="tree-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={HomeScreen} // Placeholder
+        options={{
+          tabBarLabel: 'Ajustes',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="cog-outline" size={size} color={color} />
           ),
         }}
       />
