@@ -12,11 +12,11 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { format, addDays } from 'date-fns';
+import { format, addDays, startOfMonth, endOfMonth, subMonths, addMonths, parseISO, differenceInCalendarDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations } from '../database/vacationService';
-import { getAllEmployees, updateAvailableDays } from '../database/employeeService';
-import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate } from '../database/shiftService';
+import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee } from '../database/employeeService';
+import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth } from '../database/shiftService';
 import { VacationCard } from '../components/VacationCard';
 import { ShiftBadge } from '../components/ShiftBadge';
 import { colors } from '../theme/colors';
@@ -27,6 +27,7 @@ const TABS = [
   { key: 'requests', label: 'Solicitudes', icon: 'inbox' },
   { key: 'shifts', label: 'Turnos', icon: 'calendar-edit' },
   { key: 'employees', label: 'Empleados', icon: 'account-group' },
+  { key: 'reports', label: 'Reportes', icon: 'chart-bar' },
 ];
 
 const SHIFT_OPTIONS = [
@@ -49,10 +50,23 @@ export default function AdminScreen() {
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [selectedShiftType, setSelectedShiftType] = useState('morning');
 
-  // Employee days modal
-  const [daysModalVisible, setDaysModalVisible] = useState(false);
+  // Employee edit modal
+  const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
-  const [newDays, setNewDays] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editDays, setEditDays] = useState('');
+
+  // Add employee modal
+  const [addEmpModalVisible, setAddEmpModalVisible] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [newInitialDays, setNewInitialDays] = useState('22');
+
+  // Reports
+  const [reportMonth, setReportMonth] = useState(new Date());
+  const [reportData, setReportData] = useState([]);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -73,8 +87,64 @@ export default function AdminScreen() {
     setDayShifts(s);
   }, [selectedDate]);
 
+  const loadReportData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const year = reportMonth.getFullYear();
+      const month = reportMonth.getMonth() + 1;
+      
+      const allEmps = await getAllEmployees();
+      const activeEmps = allEmps.filter(e => e.role === 'employee');
+      
+      const shiftsData = await getShiftsForMonth(year, month);
+      const allVacationsData = await getAllVacations();
+      
+      const data = activeEmps.map(emp => {
+        const empShifts = shiftsData.filter(s => s.employee_id === emp.id);
+        const morning = empShifts.filter(s => s.shift_type === 'morning').length;
+        const afternoon = empShifts.filter(s => s.shift_type === 'afternoon').length;
+        const night = empShifts.filter(s => s.shift_type === 'night').length;
+        
+        let vacDays = 0;
+        const mStart = startOfMonth(reportMonth);
+        const mEnd = endOfMonth(reportMonth);
+
+        allVacationsData.filter(v => v.employee_id === emp.id && v.status === 'approved').forEach(v => {
+          const start = parseISO(v.start_date);
+          const end = parseISO(v.end_date);
+          
+          let overlapStart = start > mStart ? start : mStart;
+          let overlapEnd = end < mEnd ? end : mEnd;
+          
+          if (overlapStart <= overlapEnd) {
+             vacDays += differenceInCalendarDays(overlapEnd, overlapStart) + 1;
+          }
+        });
+
+        return {
+          id: emp.id,
+          name: emp.name,
+          morning,
+          afternoon,
+          night,
+          vacations: vacDays,
+          totalShifts: empShifts.length
+        };
+      });
+      
+      setReportData(data);
+    } finally {
+      setLoading(false);
+    }
+  }, [reportMonth]);
+
   useEffect(() => { loadAll(); }, [loadAll]);
   useEffect(() => { loadDayShifts(); }, [loadDayShifts]);
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      loadReportData();
+    }
+  }, [activeTab, loadReportData]);
 
   const handleApprove = async (id) => {
     try {
@@ -122,18 +192,86 @@ export default function AdminScreen() {
     ]);
   };
 
-  const handleEditDays = (emp) => {
+  const handleEditEmployee = (emp) => {
     setEditingEmployee(emp);
-    setNewDays(String(emp.available_days));
-    setDaysModalVisible(true);
+    setEditName(emp.name);
+    setEditEmail(emp.email);
+    setEditDays(String(emp.available_days));
+    setEditModalVisible(true);
   };
 
-  const handleSaveDays = async () => {
-    const d = parseInt(newDays, 10);
-    if (isNaN(d) || d < 0) return;
-    await updateAvailableDays(editingEmployee.id, d);
-    await loadAll();
-    setDaysModalVisible(false);
+  const handleSaveEmployee = async () => {
+    const daysNum = parseInt(editDays, 10);
+    if (isNaN(daysNum) || daysNum < 0) {
+      Alert.alert('Error', 'Los días deben ser un número válido.');
+      return;
+    }
+    
+    try {
+      await updateEmployee(editingEmployee.id, {
+        name: editName,
+        email: editEmail,
+        available_days: daysNum
+      });
+      await loadAll();
+      setEditModalVisible(false);
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo actualizar el empleado.');
+    }
+  };
+
+  const handleDeleteEmployee = async () => {
+    Alert.alert(
+      'Eliminar Empleado',
+      `¿Estás seguro de que deseas eliminar a ${editingEmployee.name}? Esta acción es irreversible.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Eliminar', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              await deleteEmployee(editingEmployee.id);
+              await loadAll();
+              setEditModalVisible(false);
+            } catch (e) {
+              Alert.alert('Error', 'No se pudo eliminar el empleado.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleCreateEmployee = async () => {
+    if (!newName || !newEmail || !newPass) {
+      Alert.alert('Error', 'Por favor, rellena todos los campos.');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      await createEmployee({
+        name: newName,
+        email: newEmail,
+        password: newPass,
+        available_days: parseInt(newInitialDays, 10) || 22
+      });
+      
+      Alert.alert('✅ Éxito', `Empleado ${newName} creado correctamente.`);
+      setAddEmpModalVisible(false);
+      // Reset form
+      setNewName('');
+      setNewEmail('');
+      setNewPass('');
+      setNewInitialDays('22');
+      
+      await loadAll();
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo crear el empleado. Verifica si el email ya existe.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -256,30 +394,101 @@ export default function AdminScreen() {
 
           {/* Employees Tab */}
           {activeTab === 'employees' && (
-            <FlatList
-              data={employees}
-              keyExtractor={(item) => String(item.id)}
-              contentContainerStyle={styles.listContent}
-              renderItem={({ item }) => (
-                <View style={styles.empCard}>
-                  <View style={styles.empAvatar}>
-                    <Text style={styles.empAvatarText}>{item.name[0]}</Text>
+            <View style={{ flex: 1 }}>
+              <FlatList
+                data={employees}
+                keyExtractor={(item) => String(item.id)}
+                contentContainerStyle={styles.listContent}
+                renderItem={({ item }) => (
+                  <View style={styles.empCard}>
+                    <View style={styles.empAvatar}>
+                      <Text style={styles.empAvatarText}>{item.name[0]}</Text>
+                    </View>
+                    <View style={styles.empInfo}>
+                      <Text style={styles.empName}>{item.name}</Text>
+                      <Text style={styles.empEmail}>{item.email}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.daysChip}
+                      onPress={() => handleEditEmployee(item)}
+                    >
+                      <Text style={styles.daysChipNumber}>{item.available_days}</Text>
+                      <Text style={styles.daysChipLabel}>días</Text>
+                      <MaterialCommunityIcons name="pencil" size={12} color={colors.primary} />
+                    </TouchableOpacity>
                   </View>
-                  <View style={styles.empInfo}>
-                    <Text style={styles.empName}>{item.name}</Text>
-                    <Text style={styles.empEmail}>{item.email}</Text>
-                  </View>
+                )}
+                ListFooterComponent={
                   <TouchableOpacity
-                    style={styles.daysChip}
-                    onPress={() => handleEditDays(item)}
+                    style={styles.addShiftBtn}
+                    onPress={() => setAddEmpModalVisible(true)}
                   >
-                    <Text style={styles.daysChipNumber}>{item.available_days}</Text>
-                    <Text style={styles.daysChipLabel}>días</Text>
-                    <MaterialCommunityIcons name="pencil" size={12} color={colors.primary} />
+                    <MaterialCommunityIcons name="account-plus" size={18} color={colors.white} />
+                    <Text style={styles.addShiftBtnText}>Añadir nuevo empleado</Text>
                   </TouchableOpacity>
+                }
+              />
+            </View>
+          )}
+
+          {/* Reports Tab */}
+          {activeTab === 'reports' && (
+            <ScrollView contentContainerStyle={styles.listContent}>
+              <View style={styles.dateNav}>
+                <TouchableOpacity
+                  style={styles.dateNavBtn}
+                  onPress={() => setReportMonth(subMonths(reportMonth, 1))}
+                >
+                  <MaterialCommunityIcons name="chevron-left" size={22} color={colors.primary} />
+                </TouchableOpacity>
+                <Text style={styles.dateNavText}>
+                  {format(reportMonth, "MMMM yyyy", { locale: es }).replace(/^\w/, c => c.toUpperCase())}
+                </Text>
+                <TouchableOpacity
+                  style={styles.dateNavBtn}
+                  onPress={() => setReportMonth(addMonths(reportMonth, 1))}
+                >
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+
+              {reportData.length === 0 ? (
+                <View style={styles.empty}>
+                  <MaterialCommunityIcons name="text-box-search-outline" size={40} color={colors.textMuted} />
+                  <Text style={styles.emptyText}>Sin datos para este mes</Text>
                 </View>
+              ) : (
+                reportData.map((emp) => (
+                  <View key={emp.id} style={styles.reportCard}>
+                    <View style={styles.reportHeader}>
+                      <Text style={styles.reportEmpName}>{emp.name}</Text>
+                      <View style={styles.reportTotalBadge}>
+                        <Text style={styles.reportTotalText}>{emp.totalShifts} Turnos</Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.reportStatsRow}>
+                      <View style={styles.reportStat}>
+                        <MaterialCommunityIcons name="weather-sunny" size={16} color={colors.morning} />
+                        <Text style={styles.reportStatValue}>{emp.morning}</Text>
+                      </View>
+                      <View style={styles.reportStat}>
+                        <MaterialCommunityIcons name="weather-sunset" size={16} color={colors.afternoon} />
+                        <Text style={styles.reportStatValue}>{emp.afternoon}</Text>
+                      </View>
+                      <View style={styles.reportStat}>
+                        <MaterialCommunityIcons name="weather-night" size={16} color={colors.night} />
+                        <Text style={styles.reportStatValue}>{emp.night}</Text>
+                      </View>
+                      <View style={[styles.reportStat, { borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 8 }]}>
+                        <MaterialCommunityIcons name="beach" size={16} color={colors.vacation} />
+                        <Text style={[styles.reportStatValue, { color: colors.vacation }]}>{emp.vacations} d</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))
               )}
-            />
+            </ScrollView>
           )}
         </>
       )}
@@ -339,27 +548,117 @@ export default function AdminScreen() {
         </View>
       </Modal>
 
-      {/* Edit Days Modal */}
-      <Modal visible={daysModalVisible} transparent animationType="fade">
+      {/* Edit Employee Modal */}
+      <Modal visible={editModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Días disponibles</Text>
+            <Text style={styles.modalTitle}>Editar Empleado</Text>
             <Text style={styles.modalSubtitle}>{editingEmployee?.name}</Text>
+            
+            <Text style={styles.modalLabel}>Nombre</Text>
+            <TextInput
+              style={styles.formInput}
+              value={editName}
+              onChangeText={setEditName}
+            />
+
+            <Text style={styles.modalLabel}>Email</Text>
+            <TextInput
+              style={styles.formInput}
+              value={editEmail}
+              onChangeText={setEditEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+
+            <Text style={styles.modalLabel}>Días de Vacaciones</Text>
             <TextInput
               style={styles.daysInput}
-              value={newDays}
-              onChangeText={setNewDays}
+              value={editDays}
+              onChangeText={setEditDays}
               keyboardType="numeric"
               maxLength={3}
             />
+
+            <TouchableOpacity 
+              style={styles.deleteLink} 
+              onPress={handleDeleteEmployee}
+            >
+              <MaterialCommunityIcons name="account-remove" size={16} color={colors.rejected} />
+              <Text style={styles.deleteLinkText}>Eliminar empleado</Text>
+            </TouchableOpacity>
+
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setDaysModalVisible(false)}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setEditModalVisible(false)}>
                 <Text style={styles.modalCancelText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSaveDays}>
-                <Text style={styles.modalConfirmText}>Guardar</Text>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSaveEmployee}>
+                <Text style={styles.modalConfirmText}>Guardar Cambios</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Employee Modal */}
+      <Modal visible={addEmpModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modal, { maxHeight: '90%' }]}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>Nuevo Empleado</Text>
+              <Text style={styles.modalSubtitle}>Crea un nuevo perfil de acceso</Text>
+
+              <Text style={styles.modalLabel}>Nombre Completo</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Ej. Carlos Martínez"
+                value={newName}
+                onChangeText={setNewName}
+              />
+
+              <Text style={styles.modalLabel}>Correo Electrónico</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="empleado@transferlog.com"
+                value={newEmail}
+                onChangeText={setNewEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+
+              <Text style={styles.modalLabel}>Contraseña Inicial</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Mínimo 6 caracteres"
+                value={newPass}
+                onChangeText={setNewPass}
+                secureTextEntry
+              />
+
+              <Text style={styles.modalLabel}>Días de Vacaciones (Anual)</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="22"
+                value={newInitialDays}
+                onChangeText={setNewInitialDays}
+                keyboardType="numeric"
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  style={styles.modalCancelBtn} 
+                  onPress={() => setAddEmpModalVisible(false)}
+                >
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.modalConfirmBtn} 
+                  onPress={handleCreateEmployee}
+                >
+                  <Text style={styles.modalConfirmText}>Crear Perfil</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -668,4 +967,81 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginBottom: 8,
   },
+  formInput: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: typography.sizes.sm,
+    color: colors.textPrimary,
+    marginBottom: 16,
+  },
+  deleteLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 8,
+  },
+  deleteLinkText: {
+    color: colors.rejected,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    textTransform: 'uppercase',
+  },
+  reportCard: {
+    backgroundColor: colors.white,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  reportHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.background,
+    paddingBottom: 12,
+  },
+  reportEmpName: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+  },
+  reportTotalBadge: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  reportTotalText: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    color: colors.primaryDark,
+  },
+  reportStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  reportStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  reportStatValue: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    color: colors.textSecondary,
+  },
 });
+

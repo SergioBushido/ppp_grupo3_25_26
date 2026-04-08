@@ -2,85 +2,79 @@
 
 **TransferLog** es una aplicación móvil desarrollada con **React Native** y **Expo**, diseñada específicamente para empresas de transporte de pasajeros (transfer) que necesitan una gestión eficiente de los turnos laborales y las solicitudes de vacaciones de sus empleados.
 
-La aplicación utiliza **SQLite** para el almacenamiento local de datos, lo que garantiza su funcionamiento sin conexión (offline) y la persistencia de la información.
+La aplicación utiliza **Supabase** como backend en la nube, lo que permite la sincronización en tiempo real entre múltiples dispositivos y una gestión centralizada de la información.
 
 ## 🚀 Características Principales
 
 ### 👤 Gestión de Empleados y Roles
 - **Sistema de Roles:** Diferencia entre Administradores y Empleados.
-- **Acceso Seguro:** Inicio de sesión mediante credenciales locales almacenadas en SQLite.
+- **Acceso Centralizado:** Inicio de sesión seguro mediante base de datos remota.
 
 ### 📅 Control de Turnos
 - **Vista de Calendario:** Visualización de turnos en formatos semanal y mensual.
-- **Identificación Visual:** Uso de códigos de colores predefinidos para los diferentes tipos de turno (Mañana, Tarde, Noche).
-- **Asignación de Turnos:** (Admin) Capacidad para asignar, modificar o eliminar turnos de cualquier empleado.
+- **Identificación Visual:** Uso de códigos de colores para los diferentes tipos de turno (Mañana, Tarde, Noche).
+- **Asignación en Tiempo Real:** (Admin) Capacidad para asignar o modificar turnos de cualquier empleado con actualización inmediata para el trabajador.
 
 ### 🏖️ Gestión de Vacaciones
-- **Solicitud de Vacaciones:** Interfaz intuitiva para seleccionar períodos de descanso, con validación automática de días disponibles.
-- **Estado de Solicitudes:** Seguimiento en tiempo real del estado de cada solicitud (Pendiente, Aprobada, Rechazada).
-- **Panel de Aprobación (Admin):** Interfaz centralizada para que los administradores revisen y gestionen las peticiones de vacaciones.
+- **Solicitud de Vacaciones:** Interfaz intuitiva con validación automática de días disponibles.
+- **Estado de Solicitudes:** Seguimiento del estado (Pendiente, Aprobada, Rechazada).
+- **Panel de Aprobación (Admin):** Interfaz para que los administradores gestionen las peticiones.
 
 ## 🛠️ Stack Tecnológico
 
 - **Framework:** React Native con Expo SDK.
-- **Navegación:** React Navigation (Stack y Bottom Tabs).
-- **Base de Datos:** SQLite (`expo-sqlite`).
+- **Navegación:** React Navigation.
+- **Backend:** Supabase (PostgreSQL).
 - **Lógica de Fechas:** `date-fns`.
-- **Iconografía:** Material Community Icons (`@expo/vector-icons`).
+- **Iconografía:** Material Community Icons.
 
 ## 📁 Estructura del Proyecto
 
 ```text
 src/
-├── components/     # Componentes de UI reutilizables (Badge de turnos, tarjetas de vacaciones)
+├── components/     # Componentes de UI reutilizables
 ├── context/        # Estado global (Autenticación)
-├── database/       # Inicialización de DB y servicios CRUD (Servicios de turnos, vacaciones, empleados)
-├── navigation/     # Configuración de rutas y navegación por pestañas
-├── screens/        # Pantallas principales (Login, Home, Calendario, Vacaciones, Administración)
-└── theme/          # Sistema de diseño (Paleta de colores y tipografía personalizada)
+├── database/       # Servicios CRUD conectados a Supabase
+├── lib/            # Configuración de clientes (Supabase)
+├── navigation/     # Configuración de rutas
+├── screens/        # Pantallas principales
+└── theme/          # Sistema de diseño
 ```
 
-> [!IMPORTANT]
-> **Prueba la aplicación inmediatamente:**
-> Usa las siguientes credenciales para probar los diferentes roles: 
-> 
-> | Rol | Email | Contraseña |
-> | :--- | :--- | :--- |
-> | **Administrador** | `admin@transferlog.com` | `admin123` |
-> | **Empleado** | `juan@transferlog.com` | `pass123` |
-> | **Empleado** | `maria@transferlog.com` | `pass123` |
+## 🏗️ Instalación y Configuración
 
-## 🏗️ Instalación y Ejecución
-
-1.  **Clonar el repositorio:**
+1.  **Clonar e instalar:**
     ```bash
     git clone [url-del-repositorio]
     cd ppp_grupo3
-    ```
-
-2.  **Instalar dependencias:**
-    ```bash
     npm install
     ```
 
-3.  **Iniciar el proyecto con Expo:**
+2.  **Configurar Supabase:**
+    Introduce los siguientes valores en `src/lib/supabase.js`:
+    
+
+    
+3.  **Preparar la Base de Datos:**
+    Ejecuta el siguiente script en el **SQL Editor** de Supabase para crear las tablas:
+    ```sql
+    -- Crear tablas
+    CREATE TABLE employees ( ... );
+    CREATE TABLE shifts ( ... );
+    CREATE TABLE vacations ( ... );
+    ```
+
+4.  **Iniciar con Expo:**
     ```bash
     npx expo start
     ```
 
-4.  **Ejecutar en un dispositivo:**
-    - **Móvil:** Descarga la app **Expo Go**, abre la cámara y escanea el código QR mostrado en la terminal.
-    - **Emulador:** Presiona `a` en la terminal para abrir el emulador de Android (requiere Android Studio configurado).
-
-## 🔑 Credenciales de Prueba
-
-La base de datos se inicializa automáticamente con los siguientes usuarios de demostración:
+## 🔑 Credenciales de Prueba (Semilla)
 
 | Rol | Email | Contraseña |
 | :--- | :--- | :--- |
 | **Administrador** | `admin@transferlog.com` | `admin123` |
 | **Empleado** | `juan@transferlog.com` | `pass123` |
-| **Empleado** | `maria@transferlog.com` | `pass123` |
 
 ---
 Desarrollado para el **Anteproyecto de 3º DAM**.
