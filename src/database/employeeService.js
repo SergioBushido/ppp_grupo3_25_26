@@ -71,11 +71,26 @@ export async function deleteEmployee(id) {
   if (error) throw error;
 }
 
-export async function changePassword(employeeId, newPassword) {
+export async function changePassword(employeeId, currentPassword, newPassword) {
+  // First verify the current password
+  const { data: user, error: fetchError } = await supabase
+    .from('employees')
+    .select('password')
+    .eq('id', employeeId)
+    .single();
+    
+  if (fetchError || !user) throw new Error('Usuario no encontrado');
+  
+  if (user.password !== currentPassword) {
+    throw new Error('La contraseña actual es incorrecta');
+  }
+
+  // If ok, update to new
   const { error } = await supabase
     .from('employees')
     .update({ password: newPassword })
     .eq('id', employeeId);
     
-  if (error) throw error;
+  if (error) throw new Error('Error al actualizar la base de datos');
 }
+
