@@ -12,11 +12,11 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { format, addDays, startOfMonth, endOfMonth, subMonths, addMonths, parseISO, differenceInCalendarDays } from 'date-fns';
+import { format, addDays, startOfMonth, endOfMonth, subMonths, addMonths, parseISO, differenceInCalendarDays, startOfWeek, endOfWeek, subWeeks, addWeeks, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations } from '../database/vacationService';
 import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee } from '../database/employeeService';
-import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth } from '../database/shiftService';
+import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts } from '../database/shiftService';
 import { VacationCard } from '../components/VacationCard';
 import { ShiftBadge } from '../components/ShiftBadge';
 import { colors } from '../theme/colors';
@@ -48,6 +48,9 @@ export default function AdminScreen() {
   const [shiftModalVisible, setShiftModalVisible] = useState(false);
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [selectedShiftType, setSelectedShiftType] = useState('morning');
+  const [copyModalVisible, setCopyModalVisible] = useState(false);
+  const [copySummary, setCopySummary] = useState({ shifts: [], conflicts: [], sourceRange: '', targetRange: '' });
+
 
   // Employee edit modal
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -188,6 +191,84 @@ export default function AdminScreen() {
       }},
     ]);
   };
+
+  const handlePrepareCopy = async () => {
+    setLoading(true);
+    try {
+      const targetStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+      const targetEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
+      const sourceStart = subWeeks(targetStart, 1);
+      const sourceEnd = subWeeks(targetEnd, 1);
+
+      const [sourceShifts, targetVacations, targetShifts] = await Promise.all([
+        getShiftsInRange(format(sourceStart, 'yyyy-MM-dd'), format(sourceEnd, 'yyyy-MM-dd')),
+        getAllVacations(),
+        getShiftsInRange(format(targetStart, 'yyyy-MM-dd'), format(targetEnd, 'yyyy-MM-dd'))
+      ]);
+
+      const approvedVacations = targetVacations.filter(v => v.status === 'approved');
+      
+      const newShifts = [];
+      const conflicts = [];
+
+      sourceShifts.forEach(s => {
+        const sDate = parseISO(s.date);
+        const tDate = addWeeks(sDate, 1);
+        const tDateStr = format(tDate, 'yyyy-MM-dd');
+
+        const hasVacation = approvedVacations.find(v => 
+          v.employee_id === s.employee_id && 
+          isWithinInterval(tDate, { start: parseISO(v.start_date), end: parseISO(v.end_date) })
+        );
+
+        const alreadyHasShift = targetShifts.find(ts => 
+          ts.employee_id === s.employee_id && ts.date === tDateStr
+        );
+
+        if (hasVacation) {
+          conflicts.push({ ...s, reason: 'Vacaciones', targetDate: tDateStr });
+        } else if (alreadyHasShift) {
+          conflicts.push({ ...s, reason: 'Shift duplicado', targetDate: tDateStr });
+        } else {
+          newShifts.push({
+            employee_id: s.employee_id,
+            employee_name: s.employee_name,
+            date: tDateStr,
+            shift_type: s.shift_type
+          });
+        }
+      });
+
+      setCopySummary({
+        shifts: newShifts,
+        conflicts,
+        sourceRange: `${format(sourceStart, 'd MMM')} - ${format(sourceEnd, 'd MMM')}`,
+        targetRange: `${format(targetStart, 'd MMM')} - ${format(targetEnd, 'd MMM')}`
+      });
+      setCopyModalVisible(true);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'No se pudieron recuperar los turnos de la semana anterior.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExecuteCopy = async () => {
+    if (copySummary.shifts.length === 0) return;
+    setLoading(true);
+    try {
+      await bulkCreateShifts(copySummary.shifts);
+      Alert.alert('✅ Éxito', `Se han copiado ${copySummary.shifts.length} turnos correctamente.`);
+      setCopyModalVisible(false);
+      await loadDayShifts();
+    } catch (e) {
+      Alert.alert('Error', 'No se pudieron guardar los turnos.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const handleEditEmployee = (emp) => {
     setEditingEmployee(emp);
@@ -357,6 +438,19 @@ export default function AdminScreen() {
                   <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
                 </TouchableOpacity>
               </View>
+
+              {/* Batch Actions */}
+              <View style={styles.batchActions}>
+                <TouchableOpacity 
+                  style={styles.batchBtn}
+                  onPress={handlePrepareCopy}
+                >
+                  <MaterialCommunityIcons name="content-copy" size={16} color={colors.primary} />
+                  <Text style={styles.batchBtnText}>Copiar semana anterior</Text>
+                </TouchableOpacity>
+              </View>
+
+
 
               {dayShifts.length === 0 ? (
                 <View style={styles.empty}>
@@ -655,6 +749,73 @@ export default function AdminScreen() {
           </View>
         </View>
       </Modal>
+
+
+      {/* Copy Week Modal */}
+      <Modal visible={copyModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Copiar Semana</Text>
+            <Text style={styles.modalSubtitle}>Réplica de planificación anterior</Text>
+
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryTitle}>Periodos</Text>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Origen:</Text>
+                <Text style={styles.summaryValue}>{copySummary.sourceRange}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Destino:</Text>
+                <Text style={styles.summaryValue}>{copySummary.targetRange}</Text>
+              </View>
+            </View>
+
+            <View style={{ marginVertical: 10 }}>
+              <Text style={styles.summaryTitle}>Resultados</Text>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Turnos a copiar:</Text>
+                <Text style={[styles.summaryValue, { color: colors.primary }]}>{copySummary.shifts.length}</Text>
+              </View>
+              {copySummary.conflicts.length > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Conflictos (omitidos):</Text>
+                  <Text style={[styles.summaryValue, { color: colors.rejected }]}>{copySummary.conflicts.length}</Text>
+                </View>
+              )}
+            </View>
+
+            {copySummary.conflicts.length > 0 && (
+              <ScrollView style={{ maxHeight: 100, marginBottom: 10 }}>
+                {copySummary.conflicts.map((c, i) => (
+                  <View key={i} style={styles.conflictRow}>
+                    <MaterialCommunityIcons name="alert-circle-outline" size={14} color={colors.rejected} />
+                    <Text style={styles.conflictText}>
+                      {c.employee_name}: {c.reason} ({format(parseISO(c.targetDate), 'dd/MM')})
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setCopyModalVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, copySummary.shifts.length === 0 && styles.modalConfirmBtnDisabled]}
+                onPress={handleExecuteCopy}
+                disabled={copySummary.shifts.length === 0}
+              >
+                <Text style={styles.modalConfirmText}>Confirmar Copia</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -1036,5 +1197,62 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.semibold,
     color: colors.textSecondary,
   },
+  batchActions: {
+    marginBottom: 16,
+  },
+  batchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  batchBtnText: {
+    color: colors.primary,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.sm,
+  },
+  summaryCard: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 12,
+    marginVertical: 10,
+  },
+  summaryTitle: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    color: colors.textSecondary,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  summaryLabel: {
+    fontSize: typography.sizes.sm,
+    color: colors.textSecondary,
+  },
+  summaryValue: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+  },
+  conflictRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  conflictText: {
+    fontSize: typography.sizes.xs,
+    color: colors.rejected,
+  },
 });
+
 
