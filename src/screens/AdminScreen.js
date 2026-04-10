@@ -12,11 +12,11 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { format, addDays, startOfMonth, endOfMonth, subMonths, addMonths, parseISO, differenceInCalendarDays } from 'date-fns';
+import { format, addDays, startOfMonth, endOfMonth, subMonths, addMonths, parseISO, differenceInCalendarDays, startOfWeek, endOfWeek, subWeeks, addWeeks, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations } from '../database/vacationService';
+import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations, requestVacation } from '../database/vacationService';
 import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee } from '../database/employeeService';
-import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth } from '../database/shiftService';
+import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts } from '../database/shiftService';
 import { VacationCard } from '../components/VacationCard';
 import { ShiftBadge } from '../components/ShiftBadge';
 import { colors } from '../theme/colors';
@@ -48,7 +48,11 @@ export default function AdminScreen() {
   const [dayShifts, setDayShifts] = useState([]);
   const [shiftModalVisible, setShiftModalVisible] = useState(false);
   const [selectedEmp, setSelectedEmp] = useState(null);
-  const [selectedShiftType, setSelectedShiftType] = useState('morning');
+  const [dailyAssignments, setDailyAssignments] = useState({});
+  const [assignEndDate, setAssignEndDate] = useState(new Date());
+  const [copyModalVisible, setCopyModalVisible] = useState(false);
+  const [copySummary, setCopySummary] = useState({ shifts: [], conflicts: [], sourceRange: '', targetRange: '' });
+
 
   // Employee edit modal
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -169,14 +173,91 @@ export default function AdminScreen() {
     ]);
   };
 
+  const getDaysInRange = (start, end) => {
+    let s = new Date(start); s.setHours(0,0,0,0);
+    let e = new Date(end); e.setHours(0,0,0,0);
+    if (e < s) { const t=s; s=e; e=t; }
+    const days = [];
+    let cur = new Date(s);
+    while (cur <= e) {
+      days.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return days;
+  };
+
   const handleAddShift = async () => {
     if (!selectedEmp) return;
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    await deleteShiftsForEmployeeOnDate(selectedEmp.id, dateStr);
-    await createShift({ employee_id: selectedEmp.id, date: dateStr, shift_type: selectedShiftType });
-    await loadDayShifts();
-    setShiftModalVisible(false);
-    setSelectedEmp(null);
+    setLoading(true);
+    
+    try {
+      const days = getDaysInRange(selectedDate, assignEndDate);
+      const shiftsToCreate = [];
+      const datesToClear = [];
+      const vacationDays = [];
+
+      for (const date of days) {
+        const dStr = format(date, 'yyyy-MM-dd');
+        datesToClear.push(dStr);
+        
+        const task = dailyAssignments[dStr] || 'none';
+        if (task === 'morning' || task === 'afternoon' || task === 'night') {
+           shiftsToCreate.push({ employee_id: selectedEmp.id, date: dStr, shift_type: task });
+        } else if (task === 'vacation') {
+           vacationDays.push(date);
+        }
+      }
+
+      await Promise.all(datesToClear.map(dateStr => deleteShiftsForEmployeeOnDate(selectedEmp.id, dateStr)));
+      
+      if (shiftsToCreate.length > 0) {
+        await bulkCreateShifts(shiftsToCreate);
+      }
+
+      if (vacationDays.length > 0) {
+        const intervals = [];
+        let curStart = vacationDays[0];
+        let curEnd = vacationDays[0];
+
+        for (let i = 1; i < vacationDays.length; i++) {
+           const d = vacationDays[i];
+           const diff = Math.round((d - curEnd) / (1000 * 60 * 60 * 24));
+           if (diff === 1) {
+              curEnd = d;
+           } else {
+              intervals.push({start: curStart, end: curEnd});
+              curStart = d;
+              curEnd = d;
+           }
+        }
+        intervals.push({start: curStart, end: curEnd});
+
+        for (const inter of intervals) {
+          const reqId = await requestVacation({
+            employee_id: selectedEmp.id,
+            start_date: format(inter.start, 'yyyy-MM-dd'),
+            end_date: format(inter.end, 'yyyy-MM-dd'),
+            reason: 'Asignación automática desde panel'
+          });
+          await approveVacation(reqId);
+        }
+      }
+      
+      await loadDayShifts();
+      await loadAll();
+      
+      setShiftModalVisible(false);
+      setSelectedEmp(null);
+      setDailyAssignments({});
+
+      Alert.alert('✅ Éxito', `Planificación guardada:\nTurnos asignados: ${shiftsToCreate.length}\nDías de vacación: ${vacationDays.length}`);
+      
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', e.message || 'Hubo un error al guardar los turnos.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDeleteShift = async (shift) => {
@@ -191,6 +272,84 @@ export default function AdminScreen() {
       },
     ]);
   };
+
+  const handlePrepareCopy = async () => {
+    setLoading(true);
+    try {
+      const targetStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+      const targetEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
+      const sourceStart = subWeeks(targetStart, 1);
+      const sourceEnd = subWeeks(targetEnd, 1);
+
+      const [sourceShifts, targetVacations, targetShifts] = await Promise.all([
+        getShiftsInRange(format(sourceStart, 'yyyy-MM-dd'), format(sourceEnd, 'yyyy-MM-dd')),
+        getAllVacations(),
+        getShiftsInRange(format(targetStart, 'yyyy-MM-dd'), format(targetEnd, 'yyyy-MM-dd'))
+      ]);
+
+      const approvedVacations = targetVacations.filter(v => v.status === 'approved');
+      
+      const newShifts = [];
+      const conflicts = [];
+
+      sourceShifts.forEach(s => {
+        const sDate = parseISO(s.date);
+        const tDate = addWeeks(sDate, 1);
+        const tDateStr = format(tDate, 'yyyy-MM-dd');
+
+        const hasVacation = approvedVacations.find(v => 
+          v.employee_id === s.employee_id && 
+          isWithinInterval(tDate, { start: parseISO(v.start_date), end: parseISO(v.end_date) })
+        );
+
+        const alreadyHasShift = targetShifts.find(ts => 
+          ts.employee_id === s.employee_id && ts.date === tDateStr
+        );
+
+        if (hasVacation) {
+          conflicts.push({ ...s, reason: 'Vacaciones', targetDate: tDateStr });
+        } else if (alreadyHasShift) {
+          conflicts.push({ ...s, reason: 'Shift duplicado', targetDate: tDateStr });
+        } else {
+          newShifts.push({
+            employee_id: s.employee_id,
+            employee_name: s.employee_name,
+            date: tDateStr,
+            shift_type: s.shift_type
+          });
+        }
+      });
+
+      setCopySummary({
+        shifts: newShifts,
+        conflicts,
+        sourceRange: `${format(sourceStart, 'd MMM')} - ${format(sourceEnd, 'd MMM')}`,
+        targetRange: `${format(targetStart, 'd MMM')} - ${format(targetEnd, 'd MMM')}`
+      });
+      setCopyModalVisible(true);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'No se pudieron recuperar los turnos de la semana anterior.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExecuteCopy = async () => {
+    if (copySummary.shifts.length === 0) return;
+    setLoading(true);
+    try {
+      await bulkCreateShifts(copySummary.shifts);
+      Alert.alert('✅ Éxito', `Se han copiado ${copySummary.shifts.length} turnos correctamente.`);
+      setCopyModalVisible(false);
+      await loadDayShifts();
+    } catch (e) {
+      Alert.alert('Error', 'No se pudieron guardar los turnos.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const handleEditEmployee = (emp) => {
     setEditingEmployee(emp);
@@ -365,6 +524,19 @@ export default function AdminScreen() {
                 </TouchableOpacity>
               </View>
 
+              {/* Batch Actions */}
+              <View style={styles.batchActions}>
+                <TouchableOpacity 
+                  style={styles.batchBtn}
+                  onPress={handlePrepareCopy}
+                >
+                  <MaterialCommunityIcons name="content-copy" size={16} color={colors.primary} />
+                  <Text style={styles.batchBtnText}>Copiar semana anterior</Text>
+                </TouchableOpacity>
+              </View>
+
+
+
               {dayShifts.length === 0 ? (
                 <View style={styles.empty}>
                   <MaterialCommunityIcons name="calendar-blank" size={40} color={colors.textMuted} />
@@ -384,7 +556,7 @@ export default function AdminScreen() {
 
               <TouchableOpacity
                 style={styles.addShiftBtn}
-                onPress={() => setShiftModalVisible(true)}
+                onPress={() => { setAssignEndDate(selectedDate); setShiftModalVisible(true); }}
               >
                 <MaterialCommunityIcons name="plus" size={18} color={colors.white} />
                 <Text style={styles.addShiftBtnText}>Asignar turno</Text>
@@ -498,7 +670,29 @@ export default function AdminScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Asignar turno</Text>
-            <Text style={styles.modalSubtitle}>Selecciona empleado y turno</Text>
+            <Text style={styles.modalSubtitle}>Selecciona rango, empleado y turno</Text>
+
+            <View style={{ marginBottom: 12 }}>
+              <Text style={styles.modalLabel}>Rango de Fechas</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.background, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border }}>
+                <MaterialCommunityIcons name="calendar-start" size={18} color={colors.primary} />
+                <Text style={{ marginLeft: 6, fontSize: typography.sizes.sm, color: colors.textPrimary }}>{format(selectedDate, 'dd MMM', { locale: es })}</Text>
+                
+                <MaterialCommunityIcons name="arrow-right" size={16} color={colors.textMuted} style={{ marginHorizontal: 8 }} />
+                
+                <MaterialCommunityIcons name="calendar-end" size={18} color={colors.primary} />
+                <Text style={{ marginLeft: 6, fontSize: typography.sizes.sm, color: colors.textPrimary, flex: 1 }}>{format(assignEndDate, 'dd MMM', { locale: es })}</Text>
+                
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <TouchableOpacity onPress={() => setAssignEndDate(addDays(assignEndDate, -1))} style={{ padding: 4, backgroundColor: colors.white, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
+                    <MaterialCommunityIcons name="minus" size={16} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setAssignEndDate(addDays(assignEndDate, 1))} style={{ padding: 4, backgroundColor: colors.white, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
+                    <MaterialCommunityIcons name="plus" size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
 
             <Text style={styles.modalLabel}>Empleado</Text>
             {employees.map((emp) => (
@@ -513,26 +707,40 @@ export default function AdminScreen() {
               </TouchableOpacity>
             ))}
 
-            <Text style={[styles.modalLabel, { marginTop: 16 }]}>Turno</Text>
-            <View style={styles.shiftOptions}>
-              {SHIFT_OPTIONS.map((opt) => (
-                <TouchableOpacity
-                  key={opt.type}
-                  style={[styles.shiftOption, selectedShiftType === opt.type && styles.shiftOptionSelected]}
-                  onPress={() => setSelectedShiftType(opt.type)}
-                >
-                  <MaterialCommunityIcons name={opt.icon} size={20} color={selectedShiftType === opt.type ? colors.white : colors.textSecondary} />
-                  <Text style={[styles.shiftOptionText, selectedShiftType === opt.type && styles.shiftOptionTextSelected]}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <Text style={[styles.modalLabel, { marginTop: 16 }]}>Asignación por día (M, T, N, Vac, Libre)</Text>
+            <ScrollView style={{maxHeight: 250, backgroundColor: colors.background, borderRadius: 8, padding: 8}} showsVerticalScrollIndicator={false}>
+              {getDaysInRange(selectedDate, assignEndDate).map((date) => {
+                 const dStr = format(date, 'yyyy-MM-dd');
+                 const currentVal = dailyAssignments[dStr] || 'none';
+                 return (
+                   <View key={dStr} style={{flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border}}>
+                      <Text style={{fontSize: typography.sizes.sm, color: colors.textPrimary}}>{format(date, 'dd MMM (EEE)', {locale:es})}</Text>
+                      <View style={{flexDirection:'row', gap: 6}}>
+                         <TouchableOpacity onPress={() => setDailyAssignments({...dailyAssignments, [dStr]: 'morning'})} style={{padding:6, borderRadius:6, backgroundColor: currentVal === 'morning' ? colors.morning : colors.white, borderWidth:1, borderColor: currentVal === 'morning' ? colors.morning : colors.border}}>
+                            <MaterialCommunityIcons name="weather-sunny" size={18} color={currentVal === 'morning' ? colors.white : colors.morning} />
+                         </TouchableOpacity>
+                         <TouchableOpacity onPress={() => setDailyAssignments({...dailyAssignments, [dStr]: 'afternoon'})} style={{padding:6, borderRadius:6, backgroundColor: currentVal === 'afternoon' ? colors.afternoon : colors.white, borderWidth:1, borderColor: currentVal === 'afternoon' ? colors.afternoon : colors.border}}>
+                            <MaterialCommunityIcons name="weather-sunset" size={18} color={currentVal === 'afternoon' ? colors.white : colors.afternoon} />
+                         </TouchableOpacity>
+                         <TouchableOpacity onPress={() => setDailyAssignments({...dailyAssignments, [dStr]: 'night'})} style={{padding:6, borderRadius:6, backgroundColor: currentVal === 'night' ? colors.night : colors.white, borderWidth:1, borderColor: currentVal === 'night' ? colors.night : colors.border}}>
+                            <MaterialCommunityIcons name="weather-night" size={18} color={currentVal === 'night' ? colors.white : colors.night} />
+                         </TouchableOpacity>
+                         <TouchableOpacity onPress={() => setDailyAssignments({...dailyAssignments, [dStr]: 'vacation'})} style={{padding:6, borderRadius:6, backgroundColor: currentVal === 'vacation' ? colors.vacation : colors.white, borderWidth:1, borderColor: currentVal === 'vacation' ? colors.vacation : colors.border}}>
+                            <MaterialCommunityIcons name="beach" size={18} color={currentVal === 'vacation' ? colors.white : colors.vacation} />
+                         </TouchableOpacity>
+                         <TouchableOpacity onPress={() => setDailyAssignments({...dailyAssignments, [dStr]: 'none'})} style={{padding:6, borderRadius:6, backgroundColor: currentVal === 'none' ? colors.textSecondary : colors.white, borderWidth:1, borderColor: currentVal === 'none' ? colors.textSecondary : colors.border}}>
+                            <MaterialCommunityIcons name="minus" size={18} color={currentVal === 'none' ? colors.white : colors.textMuted} />
+                         </TouchableOpacity>
+                      </View>
+                   </View>
+                 )
+              })}
+            </ScrollView>
 
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { marginTop: 16 }]}>
               <TouchableOpacity
                 style={styles.modalCancelBtn}
-                onPress={() => { setShiftModalVisible(false); setSelectedEmp(null); }}
+                onPress={() => { setShiftModalVisible(false); setSelectedEmp(null); setDailyAssignments({}); }}
               >
                 <Text style={styles.modalCancelText}>Cancelar</Text>
               </TouchableOpacity>
@@ -662,6 +870,73 @@ export default function AdminScreen() {
           </View>
         </View>
       </Modal>
+
+
+      {/* Copy Week Modal */}
+      <Modal visible={copyModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Copiar Semana</Text>
+            <Text style={styles.modalSubtitle}>Réplica de planificación anterior</Text>
+
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryTitle}>Periodos</Text>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Origen:</Text>
+                <Text style={styles.summaryValue}>{copySummary.sourceRange}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Destino:</Text>
+                <Text style={styles.summaryValue}>{copySummary.targetRange}</Text>
+              </View>
+            </View>
+
+            <View style={{ marginVertical: 10 }}>
+              <Text style={styles.summaryTitle}>Resultados</Text>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Turnos a copiar:</Text>
+                <Text style={[styles.summaryValue, { color: colors.primary }]}>{copySummary.shifts.length}</Text>
+              </View>
+              {copySummary.conflicts.length > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Conflictos (omitidos):</Text>
+                  <Text style={[styles.summaryValue, { color: colors.rejected }]}>{copySummary.conflicts.length}</Text>
+                </View>
+              )}
+            </View>
+
+            {copySummary.conflicts.length > 0 && (
+              <ScrollView style={{ maxHeight: 100, marginBottom: 10 }}>
+                {copySummary.conflicts.map((c, i) => (
+                  <View key={i} style={styles.conflictRow}>
+                    <MaterialCommunityIcons name="alert-circle-outline" size={14} color={colors.rejected} />
+                    <Text style={styles.conflictText}>
+                      {c.employee_name}: {c.reason} ({format(parseISO(c.targetDate), 'dd/MM')})
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setCopyModalVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, copySummary.shifts.length === 0 && styles.modalConfirmBtnDisabled]}
+                onPress={handleExecuteCopy}
+                disabled={copySummary.shifts.length === 0}
+              >
+                <Text style={styles.modalConfirmText}>Confirmar Copia</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -1043,5 +1318,62 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.semibold,
     color: colors.textSecondary,
   },
+  batchActions: {
+    marginBottom: 16,
+  },
+  batchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  batchBtnText: {
+    color: colors.primary,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.sm,
+  },
+  summaryCard: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 12,
+    marginVertical: 10,
+  },
+  summaryTitle: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    color: colors.textSecondary,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  summaryLabel: {
+    fontSize: typography.sizes.sm,
+    color: colors.textSecondary,
+  },
+  summaryValue: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+  },
+  conflictRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  conflictText: {
+    fontSize: typography.sizes.xs,
+    color: colors.rejected,
+  },
 });
+
 

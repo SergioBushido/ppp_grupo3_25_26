@@ -14,7 +14,8 @@ export async function getShiftsByEmployee(employeeId) {
 export async function getShiftsForMonth(year, month) {
   const monthStr = String(month).padStart(2, '0');
   const startDate = `${year}-${monthStr}-01`;
-  const endDate = `${year}-${monthStr}-31`; // Postgres maneja bien el final de mes automático o podemos ser más precisos
+  const lastDay = new Date(year, month, 0).getDate();
+  const endDate = `${year}-${monthStr}-${lastDay}`;
 
   const { data, error } = await supabase
     .from('shifts')
@@ -109,3 +110,40 @@ export async function deleteShiftsForEmployeeOnDate(employeeId, date) {
   
   if (error) throw error;
 }
+
+export async function getShiftsInRange(startDate, endDate) {
+  const { data, error } = await supabase
+    .from('shifts')
+    .select(`
+      *,
+      employees (
+        name
+      )
+    `)
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date');
+  
+  if (error) throw error;
+  
+  return data.map(shift => ({
+    ...shift,
+    employee_name: shift.employees?.name
+  }));
+}
+
+export async function bulkCreateShifts(shifts) {
+  const { data, error } = await supabase
+    .from('shifts')
+    .insert(shifts.map(({ employee_id, date, shift_type, notes }) => ({
+      employee_id,
+      date,
+      shift_type,
+      notes
+    })));
+  
+  if (error) throw error;
+  return data;
+}
+
+

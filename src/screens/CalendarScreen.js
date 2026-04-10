@@ -48,9 +48,7 @@ export default function CalendarScreen({ navigation }) {
   const [employees, setEmployees] = useState([]);
   const [selectedDay, setSelectedDay] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState(
-    user.role === 'admin' ? 'all' : String(user.id)
-  );
+  const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState('all');
 
   // Assignment Modal
   const [assignmentModalVisible, setAssignmentModalVisible] = useState(false);
@@ -60,8 +58,15 @@ export default function CalendarScreen({ navigation }) {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      if (!user) {
+        setShifts([]);
+        setVacations([]);
+        setEmployees([]);
+        return;
+      }
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
+      // Traer todos los turnos del mes visible, pero todas las vacaciones del empleado
       const [shiftsData, vacationsData, empsData] = await Promise.all([
         getShiftsForMonth(year, month),
         user.role === 'admin' ? getAllVacations() : getVacationsByEmployee(user.id),
@@ -69,9 +74,9 @@ export default function CalendarScreen({ navigation }) {
       ]);
       setShifts(shiftsData);
       setVacations(vacationsData);
+      console.log('[Calendar] loadData:', { userId: user?.id, month, shifts: shiftsData.length, vacations: vacationsData.length });
       if (user.role === 'admin') {
-        const activeEmps = empsData.filter(e => e.role === 'employee');
-        setEmployees(activeEmps);
+        setEmployees(empsData.filter(e => e.role === 'employee'));
       }
     } finally {
       setLoading(false);
@@ -84,7 +89,17 @@ export default function CalendarScreen({ navigation }) {
     setRefreshing(false);
   }, [loadData]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    if (!user) return;
+    setSelectedEmployeeFilter(user.role === 'admin' ? 'all' : String(user.id));
+    loadData();
+  }, [user, currentDate, loadData]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', loadData);
+    return unsubscribe;
+  }, [navigation, loadData]);
 
   const handleDeleteShift = (shiftId) => {
     Alert.alert(
@@ -155,11 +170,22 @@ export default function CalendarScreen({ navigation }) {
   };
 
   const getVacationsForDay = (date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return vacations.filter(
-      (v) => v.status === 'approved' && dateStr >= v.start_date && dateStr <= v.end_date &&
-        (selectedEmployeeFilter === 'all' || String(v.employee_id) === selectedEmployeeFilter)
-    );
+    return vacations.filter((v) => {
+      if (v.status !== 'approved') return false;
+      try {
+        const start = parseISO(v.start_date);
+        const end = parseISO(v.end_date);
+        const d = new Date(date);
+        d.setHours(0,0,0,0);
+        const s = new Date(start);
+        s.setHours(0,0,0,0);
+        const e = new Date(end);
+        e.setHours(0,0,0,0);
+        return d >= s && d <= e && (selectedEmployeeFilter === 'all' || String(v.employee_id) === selectedEmployeeFilter);
+      } catch (err) {
+        return false;
+      }
+    });
   };
 
   const monthStart = startOfMonth(currentDate);
