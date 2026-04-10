@@ -174,6 +174,24 @@ export default function AdminScreen() {
   const handleAddShift = async () => {
     if (!selectedEmp) return;
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
+
+    const vacationConflict = allVacations.find((vacation) =>
+      vacation.employee_id === selectedEmp.id &&
+      vacation.status === 'approved' &&
+      isWithinInterval(selectedDate, {
+        start: parseISO(vacation.start_date),
+        end: parseISO(vacation.end_date),
+      })
+    );
+
+    if (vacationConflict) {
+      Alert.alert(
+        'No se puede asignar turno',
+        `El empleado tiene vacaciones aprobadas el ${format(selectedDate, 'dd/MM/yyyy')}.`
+      );
+      return;
+    }
+
     await deleteShiftsForEmployeeOnDate(selectedEmp.id, dateStr);
     await createShift({ employee_id: selectedEmp.id, date: dateStr, shift_type: selectedShiftType });
     await loadDayShifts();
