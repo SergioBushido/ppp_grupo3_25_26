@@ -46,9 +46,7 @@ export default function CalendarScreen({ navigation }) {
   const [employees, setEmployees] = useState([]);
   const [selectedDay, setSelectedDay] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState(
-    user.role === 'admin' ? 'all' : String(user.id)
-  );
+  const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState('all');
 
   // Assignment Modal
   const [assignmentModalVisible, setAssignmentModalVisible] = useState(false);
@@ -58,6 +56,12 @@ export default function CalendarScreen({ navigation }) {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      if (!user) {
+        setShifts([]);
+        setVacations([]);
+        setEmployees([]);
+        return;
+      }
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
       const [shiftsData, vacationsData, empsData] = await Promise.all([
@@ -82,7 +86,17 @@ export default function CalendarScreen({ navigation }) {
     setRefreshing(false);
   }, [loadData]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    if (!user) return;
+    setSelectedEmployeeFilter(user.role === 'admin' ? 'all' : String(user.id));
+    loadData();
+  }, [user, currentDate, loadData]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', loadData);
+    return unsubscribe;
+  }, [navigation, loadData]);
 
   const handleDeleteShift = (shiftId) => {
     Alert.alert(
