@@ -12,57 +12,85 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, addDays, differenceInCalendarDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { useAuth } from '../context/AuthContext';
 import { requestVacation } from '../database/vacationService';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 
-function DateSelector({ label, value, onIncrease, onDecrease, minDate }) {
-  return (
-    <View style={styles.dateSel}>
-      <Text style={styles.dateSelLabel}>{label}</Text>
-      <View style={styles.dateSelRow}>
-        <TouchableOpacity style={styles.dateBtn} onPress={onDecrease}>
-          <MaterialCommunityIcons name="chevron-left" size={22} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.dateValue}>
-          {format(value, "d MMM yyyy", { locale: es })}
-        </Text>
-        <TouchableOpacity style={styles.dateBtn} onPress={onIncrease}>
-          <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
+LocaleConfig.locales['es'] = {
+  monthNames: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+  monthNamesShort: ['Ene.', 'Feb.', 'Mar', 'Abr', 'May', 'Jun', 'Jul.', 'Ago', 'Sept.', 'Oct.', 'Nov.', 'Dic.'],
+  dayNames: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+  dayNamesShort: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+  today: 'Hoy'
+};
+LocaleConfig.defaultLocale = 'es';
 
 export default function RequestVacationScreen({ navigation }) {
   const { user, refreshUser } = useAuth();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [startDate, setStartDate] = useState(addDays(today, 1));
-  const [endDate, setEndDate] = useState(addDays(today, 3));
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const days = differenceInCalendarDays(endDate, startDate) + 1;
-  const canRequest = days > 0 && endDate >= startDate && days <= (user?.available_days ?? 0);
+  // Consideramos las vacaciones desde startDate hasta endDate incluídos
+  const effectiveEnd = endDate || startDate;
+  const days = startDate ? differenceInCalendarDays(effectiveEnd, startDate) + 1 : 0;
+  // Solo se puede tramitar si hay al menos un día válido seleccionado, y entra en el saldo.
+  const canRequest = days > 0 && effectiveEnd >= startDate && days <= (user?.available_days ?? 0) && startDate >= today;
 
-  const handleStartDecrease = () => {
-    const d = addDays(startDate, -1);
-    if (d > today) setStartDate(d);
+  const onDayPress = (day) => {
+    const date = parseISO(day.dateString);
+    date.setHours(0, 0, 0, 0);
+
+    // Evitar peticiones en fechas del pasado
+    if (date < today) return;
+
+    if (!startDate || (startDate && endDate)) {
+      // Si no hay nada, o si ya había un rango completo definido, reiniciamos el inicio
+      setStartDate(date);
+      setEndDate(null);
+    } else {
+      // Si ya tenemos fecha de inicio pero nos falta el fin
+      if (date < startDate) {
+        // Tocado antes del inicio, reinicia
+        setStartDate(date);
+        setEndDate(null);
+      } else {
+        // Tocado después (o el mismo día), cerramos el rango
+        setEndDate(date);
+      }
+    }
   };
-  const handleStartIncrease = () => {
-    const d = addDays(startDate, 1);
-    setStartDate(d);
-    if (d > endDate) setEndDate(addDays(d, 1));
-  };
-  const handleEndDecrease = () => {
-    const d = addDays(endDate, -1);
-    if (d >= startDate) setEndDate(d);
-  };
-  const handleEndIncrease = () => setEndDate(addDays(endDate, 1));
+
+  const markedDatesForCalendar = React.useMemo(() => {
+    const dates = {};
+    if (startDate && !endDate) {
+      const sStr = format(startDate, 'yyyy-MM-dd');
+      dates[sStr] = { startingDay: true, endingDay: true, color: colors.vacation, textColor: 'white' };
+    } else if (startDate && endDate) {
+      const sStr = format(startDate, 'yyyy-MM-dd');
+      const eStr = format(endDate, 'yyyy-MM-dd');
+      
+      if (sStr === eStr) {
+        dates[sStr] = { startingDay: true, endingDay: true, color: colors.vacation, textColor: 'white' };
+      } else {
+        dates[sStr] = { startingDay: true, color: colors.vacation, textColor: 'white' };
+        dates[eStr] = { endingDay: true, color: colors.vacation, textColor: 'white' };
+        
+        let cur = addDays(startDate, 1);
+        while (cur < endDate) {
+           dates[format(cur, 'yyyy-MM-dd')] = { color: colors.vacationLight, textColor: colors.primary };
+           cur = addDays(cur, 1);
+        }
+      }
+    }
+    return dates;
+  }, [startDate, endDate]);
 
   const handleSubmit = async () => {
     if (!canRequest) return;
@@ -71,7 +99,7 @@ export default function RequestVacationScreen({ navigation }) {
       await requestVacation({
         employee_id: user.id,
         start_date: format(startDate, 'yyyy-MM-dd'),
-        end_date: format(endDate, 'yyyy-MM-dd'),
+        end_date: format(effectiveEnd, 'yyyy-MM-dd'),
         reason: reason.trim() || null,
       });
       await refreshUser();
@@ -111,22 +139,40 @@ export default function RequestVacationScreen({ navigation }) {
 
       {/* Date selectors */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Período de vacaciones</Text>
-        <View style={styles.card}>
-          <DateSelector
-            label="Fecha de inicio"
-            value={startDate}
-            onIncrease={handleStartIncrease}
-            onDecrease={handleStartDecrease}
-          />
-          <View style={styles.separator} />
-          <DateSelector
-            label="Fecha de fin"
-            value={endDate}
-            onIncrease={handleEndIncrease}
-            onDecrease={handleEndDecrease}
-          />
-        </View>
+        <Text style={styles.sectionTitle}>Seleccionar Período</Text>
+        <Text style={{fontSize: typography.sizes.xs, color: colors.textSecondary, marginBottom: 8}}>
+          Toca en la cuadrícula el primer día y luego el último día de tus vacaciones. Si tocas un solo día dos veces, será de un día. Solo se permiten fechas futuras.
+        </Text>
+        <Calendar
+          markingType={'period'}
+          markedDates={markedDatesForCalendar}
+          onDayPress={onDayPress}
+          minDate={format(today, 'yyyy-MM-dd')}
+          firstDay={1}
+          theme={{
+            todayTextColor: colors.primary,
+            arrowColor: colors.primary,
+            textDayFontWeight: 'bold',
+            textMonthFontWeight: 'bold',
+            textDayHeaderFontWeight: 'bold',
+          }}
+          style={{borderRadius: 16, borderWidth: 1, borderColor: colors.border, paddingBottom: 10}}
+        />
+        {(startDate || endDate) && (
+          <View style={{flexDirection: 'row', justifyContent: 'center', marginTop: 12, backgroundColor: colors.white, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border}}>
+            <Text style={{fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold}}>
+              {format(startDate, "d MMM", { locale: es })}
+            </Text>
+            {startDate && endDate && startDate !== endDate && (
+              <>
+               <MaterialCommunityIcons name="arrow-right" size={16} color={colors.textMuted} style={{marginHorizontal: 12}} />
+               <Text style={{fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold}}>
+                 {format(endDate, "d MMM yyyy", { locale: es })}
+               </Text>
+              </>
+            )}
+          </View>
+        )}
       </View>
 
       {/* Warning if not enough days */}
