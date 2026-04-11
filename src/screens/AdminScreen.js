@@ -14,6 +14,16 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, addDays, startOfMonth, endOfMonth, subMonths, addMonths, parseISO, differenceInCalendarDays, startOfWeek, endOfWeek, subWeeks, addWeeks, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Calendar, LocaleConfig } from 'react-native-calendars';
+
+LocaleConfig.locales['es'] = {
+  monthNames: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+  monthNamesShort: ['Ene.', 'Feb.', 'Mar', 'Abr', 'May', 'Jun', 'Jul.', 'Ago', 'Sept.', 'Oct.', 'Nov.', 'Dic.'],
+  dayNames: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+  dayNamesShort: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+  today: 'Hoy'
+};
+LocaleConfig.defaultLocale = 'es';
 import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations, requestVacation } from '../database/vacationService';
 import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee } from '../database/employeeService';
 import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts } from '../database/shiftService';
@@ -49,8 +59,35 @@ export default function AdminScreen() {
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [dailyAssignments, setDailyAssignments] = useState({});
   const [assignEndDate, setAssignEndDate] = useState(new Date());
+  const [activeBrush, setActiveBrush] = useState('morning');
   const [copyModalVisible, setCopyModalVisible] = useState(false);
   const [copySummary, setCopySummary] = useState({ shifts: [], conflicts: [], sourceRange: '', targetRange: '' });
+
+  const getShiftColor = useCallback((type) => {
+    switch (type) {
+      case 'morning': return colors.morning;
+      case 'afternoon': return colors.afternoon;
+      case 'night': return colors.night;
+      case 'vacation': return colors.vacation;
+      default: return colors.background;
+    }
+  }, []);
+
+  const markedDatesForCalendar = React.useMemo(() => {
+    const dates = {};
+    Object.keys(dailyAssignments).forEach(dateStr => {
+      const type = dailyAssignments[dateStr];
+      if (type && type !== 'none') {
+        dates[dateStr] = {
+           customStyles: {
+             container: { backgroundColor: getShiftColor(type), borderRadius: 8 },
+             text: { color: colors.white, fontWeight: 'bold' }
+           }
+        };
+      }
+    });
+    return dates;
+  }, [dailyAssignments, getShiftColor]);
 
 
   // Employee edit modal
@@ -185,6 +222,10 @@ export default function AdminScreen() {
     return days;
   };
 
+  const handleFillAll = (type) => {
+    // Deprecated with interactive calendar, but kept minimal to avoid breaks if referenced.
+  };
+
   const handleAddShift = async () => {
     if (!selectedEmp) return;
     setLoading(true);
@@ -194,9 +235,22 @@ export default function AdminScreen() {
       const shiftsToCreate = [];
       const datesToClear = [];
       const vacationDays = [];
+      let omittedCount = 0;
+
+      const empVacations = allVacations.filter(v => v.employee_id === selectedEmp.id && v.status === 'approved');
 
       for (const date of days) {
         const dStr = format(date, 'yyyy-MM-dd');
+        
+        const hasConflict = empVacations.some(v => 
+          isWithinInterval(date, { start: parseISO(v.start_date), end: parseISO(v.end_date) })
+        );
+
+        if (hasConflict) {
+          omittedCount++;
+          continue;
+        }
+
         datesToClear.push(dStr);
         
         const task = dailyAssignments[dStr] || 'none';
@@ -249,7 +303,10 @@ export default function AdminScreen() {
       setSelectedEmp(null);
       setDailyAssignments({});
 
-      Alert.alert('✅ Éxito', `Planificación guardada:\nTurnos asignados: ${shiftsToCreate.length}\nDías de vacación: ${vacationDays.length}`);
+      Alert.alert(
+        '✅ Éxito',
+        `Planificación guardada:\nTurnos asignados: ${shiftsToCreate.length}\nDías de vacación solicitados: ${vacationDays.length}${omittedCount > 0 ? `\n\n⚠️ Omitidos por vacaciones aprobadas: ${omittedCount}` : ''}`
+      );
       
     } catch (e) {
       console.error(e);
@@ -662,73 +719,62 @@ export default function AdminScreen() {
       <Modal visible={shiftModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Asignar turno</Text>
-            <Text style={styles.modalSubtitle}>Selecciona rango, empleado y turno</Text>
+            <Text style={styles.modalTitle}>Asignación Múltiple</Text>
+            <Text style={styles.modalSubtitle}>Selecciona el empleado y 'pinta' los turnos directamente en el calendario.</Text>
 
-            <View style={{ marginBottom: 12 }}>
-              <Text style={styles.modalLabel}>Rango de Fechas</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.background, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border }}>
-                <MaterialCommunityIcons name="calendar-start" size={18} color={colors.primary} />
-                <Text style={{ marginLeft: 6, fontSize: typography.sizes.sm, color: colors.textPrimary }}>{format(selectedDate, 'dd MMM', { locale: es })}</Text>
-                
-                <MaterialCommunityIcons name="arrow-right" size={16} color={colors.textMuted} style={{ marginHorizontal: 8 }} />
-                
-                <MaterialCommunityIcons name="calendar-end" size={18} color={colors.primary} />
-                <Text style={{ marginLeft: 6, fontSize: typography.sizes.sm, color: colors.textPrimary, flex: 1 }}>{format(assignEndDate, 'dd MMM', { locale: es })}</Text>
-                
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  <TouchableOpacity onPress={() => setAssignEndDate(addDays(assignEndDate, -1))} style={{ padding: 4, backgroundColor: colors.white, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
-                    <MaterialCommunityIcons name="minus" size={16} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setAssignEndDate(addDays(assignEndDate, 1))} style={{ padding: 4, backgroundColor: colors.white, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
-                    <MaterialCommunityIcons name="plus" size={16} color={colors.primary} />
-                  </TouchableOpacity>
-                </View>
-              </View>
+            <Text style={styles.modalLabel}>Empleado Seleccionado</Text>
+            <ScrollView style={{maxHeight: 120, marginBottom: 12}} showsVerticalScrollIndicator={false}>
+              {employees.map((emp) => (
+                <TouchableOpacity
+                  key={emp.id}
+                  style={[styles.empOption, selectedEmp?.id === emp.id && styles.empOptionSelected]}
+                  onPress={() => setSelectedEmp(emp)}
+                >
+                  <Text style={[styles.empOptionText, selectedEmp?.id === emp.id && styles.empOptionTextSelected]}>
+                    {emp.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.modalLabel}>Pincel (Turno a asignar)</Text>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16}}>
+                <TouchableOpacity onPress={() => setActiveBrush('morning')} style={{padding:8, borderRadius:8, backgroundColor: activeBrush === 'morning' ? colors.morning : colors.white, borderWidth:1, borderColor: colors.morning}}>
+                  <MaterialCommunityIcons name="weather-sunny" size={24} color={activeBrush === 'morning' ? colors.white : colors.morning} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setActiveBrush('afternoon')} style={{padding:8, borderRadius:8, backgroundColor: activeBrush === 'afternoon' ? colors.afternoon : colors.white, borderWidth:1, borderColor: colors.afternoon}}>
+                  <MaterialCommunityIcons name="weather-sunset" size={24} color={activeBrush === 'afternoon' ? colors.white : colors.afternoon} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setActiveBrush('night')} style={{padding:8, borderRadius:8, backgroundColor: activeBrush === 'night' ? colors.night : colors.white, borderWidth:1, borderColor: colors.night}}>
+                  <MaterialCommunityIcons name="weather-night" size={24} color={activeBrush === 'night' ? colors.white : colors.night} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setActiveBrush('vacation')} style={{padding:8, borderRadius:8, backgroundColor: activeBrush === 'vacation' ? colors.vacation : colors.white, borderWidth:1, borderColor: colors.vacation}}>
+                  <MaterialCommunityIcons name="beach" size={24} color={activeBrush === 'vacation' ? colors.white : colors.vacation} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setActiveBrush('none')} style={{padding:8, borderRadius:8, backgroundColor: activeBrush === 'none' ? colors.textSecondary : colors.white, borderWidth:1, borderColor: colors.textSecondary}}>
+                  <MaterialCommunityIcons name="eraser" size={24} color={activeBrush === 'none' ? colors.white : colors.textMuted} />
+                </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalLabel}>Empleado</Text>
-            {employees.map((emp) => (
-              <TouchableOpacity
-                key={emp.id}
-                style={[styles.empOption, selectedEmp?.id === emp.id && styles.empOptionSelected]}
-                onPress={() => setSelectedEmp(emp)}
-              >
-                <Text style={[styles.empOptionText, selectedEmp?.id === emp.id && styles.empOptionTextSelected]}>
-                  {emp.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-
-            <Text style={[styles.modalLabel, { marginTop: 16 }]}>Asignación por día (M, T, N, Vac, Libre)</Text>
-            <ScrollView style={{maxHeight: 250, backgroundColor: colors.background, borderRadius: 8, padding: 8}} showsVerticalScrollIndicator={false}>
-              {getDaysInRange(selectedDate, assignEndDate).map((date) => {
-                 const dStr = format(date, 'yyyy-MM-dd');
-                 const currentVal = dailyAssignments[dStr] || 'none';
-                 return (
-                   <View key={dStr} style={{flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border}}>
-                      <Text style={{fontSize: typography.sizes.sm, color: colors.textPrimary}}>{format(date, 'dd MMM (EEE)', {locale:es})}</Text>
-                      <View style={{flexDirection:'row', gap: 6}}>
-                         <TouchableOpacity onPress={() => setDailyAssignments({...dailyAssignments, [dStr]: 'morning'})} style={{padding:6, borderRadius:6, backgroundColor: currentVal === 'morning' ? colors.morning : colors.white, borderWidth:1, borderColor: currentVal === 'morning' ? colors.morning : colors.border}}>
-                            <MaterialCommunityIcons name="weather-sunny" size={18} color={currentVal === 'morning' ? colors.white : colors.morning} />
-                         </TouchableOpacity>
-                         <TouchableOpacity onPress={() => setDailyAssignments({...dailyAssignments, [dStr]: 'afternoon'})} style={{padding:6, borderRadius:6, backgroundColor: currentVal === 'afternoon' ? colors.afternoon : colors.white, borderWidth:1, borderColor: currentVal === 'afternoon' ? colors.afternoon : colors.border}}>
-                            <MaterialCommunityIcons name="weather-sunset" size={18} color={currentVal === 'afternoon' ? colors.white : colors.afternoon} />
-                         </TouchableOpacity>
-                         <TouchableOpacity onPress={() => setDailyAssignments({...dailyAssignments, [dStr]: 'night'})} style={{padding:6, borderRadius:6, backgroundColor: currentVal === 'night' ? colors.night : colors.white, borderWidth:1, borderColor: currentVal === 'night' ? colors.night : colors.border}}>
-                            <MaterialCommunityIcons name="weather-night" size={18} color={currentVal === 'night' ? colors.white : colors.night} />
-                         </TouchableOpacity>
-                         <TouchableOpacity onPress={() => setDailyAssignments({...dailyAssignments, [dStr]: 'vacation'})} style={{padding:6, borderRadius:6, backgroundColor: currentVal === 'vacation' ? colors.vacation : colors.white, borderWidth:1, borderColor: currentVal === 'vacation' ? colors.vacation : colors.border}}>
-                            <MaterialCommunityIcons name="beach" size={18} color={currentVal === 'vacation' ? colors.white : colors.vacation} />
-                         </TouchableOpacity>
-                         <TouchableOpacity onPress={() => setDailyAssignments({...dailyAssignments, [dStr]: 'none'})} style={{padding:6, borderRadius:6, backgroundColor: currentVal === 'none' ? colors.textSecondary : colors.white, borderWidth:1, borderColor: currentVal === 'none' ? colors.textSecondary : colors.border}}>
-                            <MaterialCommunityIcons name="minus" size={18} color={currentVal === 'none' ? colors.white : colors.textMuted} />
-                         </TouchableOpacity>
-                      </View>
-                   </View>
-                 )
-              })}
-            </ScrollView>
+            <Calendar
+              markingType={'custom'}
+              markedDates={markedDatesForCalendar}
+              onDayPress={(day) => {
+                setDailyAssignments(prev => ({
+                  ...prev,
+                  [day.dateString]: activeBrush
+                }));
+              }}
+              firstDay={1}
+              theme={{
+                todayTextColor: colors.primary,
+                arrowColor: colors.primary,
+                textDayFontWeight: 'bold',
+                textMonthFontWeight: 'bold',
+                textDayHeaderFontWeight: 'bold',
+              }}
+              style={{borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingBottom: 10}}
+            />
 
             <View style={[styles.modalActions, { marginTop: 16 }]}>
               <TouchableOpacity

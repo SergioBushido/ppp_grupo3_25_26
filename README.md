@@ -12,14 +12,16 @@ La aplicación utiliza **Supabase** como backend en la nube, lo que permite la s
 - **Seguridad Avanzada:** Cambio de contraseña con validación de identidad (contraseña actual).
 
 ### 📅 Control de Turnos y Horarios
-- **Vista de Calendario Dual:** Visualización en formatos semanal y mensual con diseño premium.
+- **Vista de Calendario Interactivo:** Visualización en formato mensual con navegación avanzada, visualización integrada de vacaciones y previsualización de eventos (tooltips).
 - **Asignación Inteligente (Admin):** Sistema de asignación de turnos con **validación de conflictos** (evita asignar turnos durante vacaciones o solapamientos).
+- **Copia Rápida de Turnos (Admin):** Herramienta para la optimización de planificación que permite clonar los turnos de la semana anterior de forma transaccional.
 - **Gestión Operativa:** Capacidad para eliminar y reasignar turnos directamente desde la vista diaria.
 
 ### 🏖️ Gestión de Vacaciones y Ausencias
 - **Flujo de Solicitudes:** Interfaz intuitiva con cálculo automático de días disponibles.
 - **Autogestión:** Los empleados pueden cancelar sus solicitudes pendientes directamente.
 - **Panel de Aprobación (Admin):** Gestión centralizada de peticiones con estados sincronizados.
+- **Sincronización:** Reflejo automático e interactivo de los períodos vacacionales aprobados en el calendario de turnos.
 
 ### 📊 Reportes y Estadísticas (Admin)
 - **Cómputo Mensual:** Nueva pestaña de reportes que calcula automáticamente:
@@ -66,4 +68,24 @@ src/
     ```
 
 ---
-Desarrollado para el **Anteproyecto de 3º DAM** (IES Puerto de la Cruz - Telesforo Bravo).
+Desarrollado para el **Anteproyecto de 3º DAM** 
+
+---
+
+## 📖 Anexo: Evolución de la Asignación Masiva de Turnos
+
+Durante el desarrollo de la aplicación, nos encontramos con un desafío importante respecto a la **asignación de turnos a largo plazo** por parte del administrador.
+
+### 1. Limitaciones Iniciales
+En la primera iteración, la asignación de turnos requería que el administrador seleccionara una fecha de inicio y una de fin. Esto generaba un listado lineal de días sobre el cual el usuario debía hacer *scroll* y asignar manualmente el tipo de turno a cada día. Esta aproximación era ineficiente, propensa a errores (al no visualizar visualmente los fines de semana de forma clara) y lenta para planificar meses enteros. 
+
+### 2. Descubrimientos en la Implementación
+Al intentar automatizar el proceso con botones de "Relleno masivo", nos dimos cuenta de que un rango estricto estático (Inicio a Fin) perdía gran flexibilidad. En la operativa real de una empresa de transportes, es común necesitar asignar turnos a **días salteados** (ej. "todos los lunes y miércoles del mes") y un selector lineal tradicional no lo permitía sin forzar al usuario a repetir la operación varias veces.
+
+### 3. La Solución Óptima
+Tras analizar los estándares de UX en herramientas profesionales de productividad modernas, pivotamos hacia un enfoque de **Calendario Visual de Selección Múltiple**. Integramos la librería nativa `react-native-calendars` para presentar una cuadrícula mensual completa directamente dentro del flujo de asignación. 
+
+**¿Por qué fue la mejor solución?**
+- **Flexibilidad:** Permite la selección arbitraria de días salteados o semanas completas tocando en la cuadrícula del calendario.
+- **Contexto Visual:** Otorga un *feedback* inmediato al administrador sobre qué porción del mes está a punto de modificar.
+- **Seguridad (Validación Cruzada):** Sumado a esta nueva interfaz, el sistema evalúa los días seleccionados y **omite automáticamente** la creación de turnos si detecta que la fecha elegida colisiona con unas vacaciones previamente aprobadas en Supabase, asegurando la integridad de los horarios de la empresa.
