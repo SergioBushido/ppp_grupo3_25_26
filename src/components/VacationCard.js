@@ -79,7 +79,7 @@ export function VacationCard({ vacation, isAdmin = false, onApprove, onReject, o
       {isAdmin && vacation.status === 'rejected' && (
         <View style={styles.actions}>
           <TouchableOpacity
-            style={[styles.actionBtn, styles.primaryBtn, {flex: 2}]}eliminar
+            style={[styles.actionBtn, styles.primaryBtn, {flex: 2}]}
             onPress={() => onReactive?.(vacation.id)}
           >
             <MaterialCommunityIcons name="restore" size={16} color={colors.white} />

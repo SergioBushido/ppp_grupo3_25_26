@@ -214,9 +214,9 @@ export default function AdminScreen() {
   const handleCancel = async (vacation) => {
 
     Alert.alert('Cancelar solicitud', '¿Seguro que quiere cancelar la solicitud?', [
-      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Atrás', style: 'cancel' },
       {
-        text: 'Rechazar', style: 'destructive',
+        text: 'Confirmar', style: 'destructive',
         onPress: async () => {
           await cancelVacation(vacation);
           await loadAll();
