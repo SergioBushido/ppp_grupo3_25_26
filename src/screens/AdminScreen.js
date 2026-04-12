@@ -25,7 +25,7 @@ LocaleConfig.locales['es'] = {
   today: 'Hoy'
 };
 LocaleConfig.defaultLocale = 'es';
-import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations, requestVacation, cancelVacation, reactiveVacation } from '../database/vacationService';
+import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations, requestVacation, cancelVacation, reactiveVacation, deleteVacation } from '../database/vacationService';
 import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee } from '../database/employeeService';
 import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts } from '../database/shiftService';
 import { VacationCard } from '../components/VacationCard';
@@ -237,6 +237,25 @@ export default function AdminScreen() {
         },
       },
     ]);
+  };
+
+  const handleDelete = async (idVacation) => {
+
+    Alert.alert(
+  '¿Seguro que quieres eliminar la solicitud?',
+  'Esta acción no se puede deshacer.',
+  [
+    { text: 'Cancelar', style: 'cancel' },
+    {
+      text: 'Eliminar',
+      style: 'destructive',
+      onPress: async () => {
+        await deleteVacation(idVacation);
+        await loadAll();
+      },
+    },
+  ]
+);
   };
 
   const getDaysInRange = (start, end) => {
@@ -591,7 +610,7 @@ export default function AdminScreen() {
                   onReject={handleReject}
                   onCancel={handleCancel}
                   onReactive={handleReactive}
-                  onLoad={loadAll}
+                  onDelete={handleDelete}
                 />
               )}
             />

@@ -13,7 +13,7 @@ const STATUS_CONFIG = {
   rejected: { label: 'Rechazada', color: colors.rejected, bg: colors.rejectedLight, icon: 'close-circle-outline' },
 };
 
-export function VacationCard({ vacation, isAdmin = false, onApprove, onReject, onCancel, onReactive }) {
+export function VacationCard({ vacation, isAdmin = false, onApprove, onReject, onCancel, onReactive, onDelete }) {
   const status = STATUS_CONFIG[vacation.status] || STATUS_CONFIG.pending;
   const days = differenceInCalendarDays(parseISO(vacation.end_date), parseISO(vacation.start_date)) + 1;
 
@@ -79,11 +79,19 @@ export function VacationCard({ vacation, isAdmin = false, onApprove, onReject, o
       {isAdmin && vacation.status === 'rejected' && (
         <View style={styles.actions}>
           <TouchableOpacity
-            style={[styles.actionBtn, styles.primaryBtn]}
+            style={[styles.actionBtn, styles.primaryBtn, {flex: 2}]}eliminar
             onPress={() => onReactive?.(vacation.id)}
           >
             <MaterialCommunityIcons name="restore" size={16} color={colors.white} />
             <Text style={styles.actionBtnText}>Reactivar</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.rejectBtn, {flex: 1}]}
+            onPress={() => onDelete?.(vacation.id)}
+          >
+            <MaterialCommunityIcons name="delete" size={16} color={colors.white} />
+            <Text style={styles.actionBtnText}>Eliminar</Text>
           </TouchableOpacity>
         </View>
 
