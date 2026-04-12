@@ -242,20 +242,20 @@ export default function AdminScreen() {
   const handleDelete = async (idVacation) => {
 
     Alert.alert(
-  '¿Seguro que quieres eliminar la solicitud?',
-  'Esta acción no se puede deshacer.',
-  [
-    { text: 'Cancelar', style: 'cancel' },
-    {
-      text: 'Eliminar',
-      style: 'destructive',
-      onPress: async () => {
-        await deleteVacation(idVacation);
-        await loadAll();
-      },
-    },
-  ]
-);
+      '¿Seguro que quieres eliminar la solicitud?',
+      'Esta acción no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteVacation(idVacation);
+            await loadAll();
+          },
+        },
+      ]
+    );
   };
 
   const getDaysInRange = (start, end) => {
@@ -539,10 +539,10 @@ export default function AdminScreen() {
   };
 
   useFocusEffect(
-      useCallback(() => {
-        loadAll();
-      }, [loadAll])
-    );
+    useCallback(() => {
+      loadAll();
+    }, [loadAll])
+  );
 
   return (
     <View style={styles.container}>

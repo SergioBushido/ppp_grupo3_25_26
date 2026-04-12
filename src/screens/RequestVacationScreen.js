@@ -32,8 +32,6 @@ export default function RequestVacationScreen({ navigation }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-
-  console.log(onDayPress);
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [reason, setReason] = useState('');

@@ -15,6 +15,7 @@ import { VacationCard } from '../components/VacationCard';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { SafeAreaView } from "react-native-safe-area-context"
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function VacationsScreen({ navigation }) {
   const { user, refreshUser } = useAuth();
@@ -27,6 +28,11 @@ export default function VacationsScreen({ navigation }) {
     setVacations(data);
     setLoading(false);
   }, [user.id]);
+
+  useEffect(() => {
+    loadVacations()
+  }, [user.available_days]);
+
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', loadVacations);
@@ -126,7 +132,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 20
-  
+
   },
   headerTitle: {
     fontSize: typography.sizes.xl,
@@ -139,7 +145,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 16,
     paddingVertical: 16,
-  
+
   },
   statItem: {
     flex: 1,
