@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import LoginScreen from '../screens/LoginScreen';
@@ -19,6 +20,25 @@ import { typography } from '../theme/typography';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+const TabIcon = ({ name, color, focused, isSpecial }) => (
+  <View style={styles.iconContainer}>
+    {isSpecial ? (
+      <View style={[styles.iconWrapper, { backgroundColor: colors.vacationBrand }]}>
+        <MaterialCommunityIcons name={name} size={24} color={colors.white} />
+      </View>
+    ) : (
+      <MaterialCommunityIcons name={focused ? name : `${name}-outline`} size={26} color={color} />
+    )}
+  </View>
+);
+
+const TabLabel = ({ label, focused, color }) => (
+  <View style={styles.labelWrapper}>
+    <Text style={[styles.label, { color }]}>{label}</Text>
+    {focused && <View style={styles.indicator} />}
+  </View>
+);
+
 function MainTabs() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -27,25 +47,18 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.white,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          height: 65 + insets.bottom,
-          paddingBottom: 10 + insets.bottom,
-          paddingTop: 8,
-          elevation: 10,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-        },
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            height: 70 + insets.bottom,
+            paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
+          }
+        ],
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: {
-          fontSize: typography.sizes.xs,
-          fontWeight: typography.weights.bold,
-          marginTop: 2,
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
         },
       }}
     >
@@ -53,9 +66,11 @@ function MainTabs() {
         name="Home"
         component={HomeScreen}
         options={{
-          tabBarLabel: 'Inicio',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home" size={28} color={color} />
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="Inicio" focused={focused} color={color} />
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="home" color={color} focused={focused} />
           ),
         }}
       />
@@ -63,9 +78,11 @@ function MainTabs() {
         name="Calendar"
         component={CalendarScreen}
         options={{
-          tabBarLabel: 'Horario',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="clock-outline" size={26} color={color} />
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="Horario" focused={focused} color={color} />
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="clock" color={color} focused={focused} />
           ),
         }}
       />
@@ -73,9 +90,11 @@ function MainTabs() {
         name="Vacations"
         component={VacationsScreen}
         options={{
-          tabBarLabel: 'Vacaciones',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="umbrella-beach" size={26} color={color} />
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="Vacaciones" focused={focused} color={color} />
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="umbrella-beach" color={color} focused={focused} isSpecial />
           ),
         }}
       />
@@ -83,21 +102,14 @@ function MainTabs() {
         name="Settings"
         component={SettingsScreen}
         options={{
-          tabBarLabel: 'Ajustes',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="cog-outline" size={26} color={color} />
+          tabBarLabel: ({ focused, color }) => (
+            <TabLabel label="Ajustes" focused={focused} color={color} />
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="cog" color={color} focused={focused} />
           ),
         }}
       />
-      {user?.role === 'admin' && (
-        <Tab.Screen
-          name="Admin"
-          component={AdminScreen}
-          options={{
-            tabBarButton: () => null, // Ocultar el botón visual
-          }}
-        />
-      )}
     </Tab.Navigator>
   );
 }
@@ -112,6 +124,11 @@ export default function AppNavigator() {
       ) : (
         <>
           <Stack.Screen name="Main" component={MainTabs} />
+          <Stack.Screen
+            name="Admin"
+            component={AdminScreen}
+            options={{ headerShown: false }}
+          />
           <Stack.Screen
             name="RequestVacation"
             component={RequestVacationScreen}
@@ -129,3 +146,54 @@ export default function AppNavigator() {
     </Stack.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: colors.white,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    paddingTop: 12,
+  },
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 32,
+  },
+  iconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.vacationBrand,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  labelWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 24,
+    marginTop: 4,
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: typography.weights.bold,
+    textAlign: 'center',
+  },
+  indicator: {
+    width: 16,
+    height: 3,
+    backgroundColor: colors.primary,
+    borderRadius: 2,
+    marginTop: 2,
+  },
+});

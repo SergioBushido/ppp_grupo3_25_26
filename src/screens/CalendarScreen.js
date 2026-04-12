@@ -347,9 +347,18 @@ export default function CalendarScreen({ navigation }) {
 
           {selectedDay && (
             <View style={styles.dayDetail}>
-              <Text style={styles.dayDetailTitle}>
-                {format(selectedDay, "EEEE, d 'de' MMMM", { locale: es }).replace(/^\w/, c => c.toUpperCase())}
-              </Text>
+              <View style={styles.dayDetailHeader}>
+                <Text style={styles.dayDetailTitle}>
+                  {format(selectedDay, "EEEE, d 'de' MMMM", { locale: es }).replace(/^\w/, c => c.toUpperCase())}
+                </Text>
+                <TouchableOpacity
+                  style={styles.closePanelBtn}
+                  onPress={() => setSelectedDay(null)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialCommunityIcons name="close" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
               {selectedDayShifts.length > 0 ? (
                 selectedDayShifts.map((s, i) => (
                   <View key={i} style={styles.dayDetailRow}>
@@ -678,12 +687,27 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginBottom: 40,
   },
+  dayDetailHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
   dayDetailTitle: {
+    flex: 1,
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.bold,
     color: colors.textPrimary,
-    marginBottom: 16,
     textTransform: 'capitalize',
+    paddingRight: 8,
+  },
+  closePanelBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   dayDetailRow: {
     flexDirection: 'row',
