@@ -47,7 +47,6 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
   );
 
 
-  const oldAvailableDays = differenceInCalendarDays((employeeVacation?.end_date), (employeeVacation?.start_date)) + 1 + employeeVacation?.employees.available_days;
   const newAvailableDays = differenceInCalendarDays((employeeVacation?.end_date), (employeeVacation?.start_date)) + 1 + employeeVacation?.employees.available_days;
 
   const [loading, setLoading] = useState(false);
@@ -57,6 +56,10 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
   const days = startDate ? differenceInCalendarDays(effectiveEnd, startDate) + 1 : 0;
   // Solo se puede tramitar si hay al menos un día válido seleccionado, y entra en el saldo.
   const canRequest = days > 0 && effectiveEnd >= startDate && days <= (newAvailableDays ?? 0) && startDate >= today;
+
+  const canRequestIfDatesAreEqual =
+    format(startDate, 'yyyy-MM-dd') === employeeVacation?.start_date &&
+    format(endDate, 'yyyy-MM-dd') === employeeVacation?.end_date;
 
   const onDayPress = (day) => {
     const date = parseISO(day.dateString);
@@ -116,7 +119,7 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
         employee_id: employeeVacation?.employee_id,
         start_date: format(startDate, 'yyyy-MM-dd'),
         end_date: format(effectiveEnd, 'yyyy-MM-dd'),
-        old_available_days: oldAvailableDays
+        available_days: newAvailableDays
       });
 
       await refreshUser();
@@ -138,16 +141,16 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
       {/* Header summary */}
       <View style={styles.summary}>
         <View style={styles.summaryDetails}>
-          <MaterialCommunityIcons name="account" size={30} color={colors.textSecondary} />
+          <MaterialCommunityIcons name="account" size={25} color={colors.textSecondary} />
           <Text style={styles.summaryText}>{employeeVacation.employees.name}</Text>
         </View>
         <View style={styles.summaryDetails}>
-          <View style={{ flexDirection: 'row', justifyContent: 'center', backgroundColor: colors.white, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
-            <Text style={{ fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', backgroundColor: colors.white, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, gap: 8 }}>
+            <Text style={{ fontSize: 12, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
               {format(employeeVacation?.start_date, "d MMM", { locale: es })}
             </Text>
-            <MaterialCommunityIcons name="arrow-right" size={16} color={colors.textMuted} style={{ marginHorizontal: 12 }} />
-            <Text style={{ fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
+            <MaterialCommunityIcons name="arrow-right" size={16} color={colors.textMuted} />
+            <Text style={{ fontSize: 12, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
               {format(employeeVacation?.end_date, "d MMM yyyy", { locale: es })}
             </Text>
           </View>
@@ -159,6 +162,7 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
           <Text style={styles.summaryNumber}>{days}</Text>
           <Text style={styles.summaryLabel}>Días solicitados</Text>
         </View>
+        <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryNumber, days > (newAvailableDays ?? 0) && styles.summaryNumberDanger]}>
             {(newAvailableDays ?? 0) - (canRequest ? days : 0)}
@@ -221,7 +225,6 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
       )}
 
       {/* Reason */}
-
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Motivo</Text>
         <View style={styles.card}>
@@ -242,9 +245,9 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
 
       {/* Submit */}
       <TouchableOpacity
-        style={[styles.submitBtn, !canRequest && styles.submitBtnDisabled]}
+        style={[styles.submitBtn, (!canRequest || canRequestIfDatesAreEqual) && styles.submitBtnDisabled]}
         onPress={handleSubmit}
-        disabled={!canRequest || loading}
+        disabled={((!canRequest || canRequestIfDatesAreEqual) || loading)}
       >
         {loading ? (
           <ActivityIndicator color={colors.white} />
@@ -273,15 +276,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10
+    gap: 10,
   },
   summaryDetails: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10
+    gap: 10,
+
   },
   summaryText: {
-    fontSize: typography.sizes.xl
+    fontSize: typography.sizes.md
   },
   summaryCard: {
     backgroundColor: colors.primary,
@@ -293,6 +297,7 @@ const styles = StyleSheet.create({
   summaryItem: {
     flex: 1,
     alignItems: 'center',
+    paddingHorizontal: 2
   },
   summaryNumber: {
     fontSize: typography.sizes.xxl,
