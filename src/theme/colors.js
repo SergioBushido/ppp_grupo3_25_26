@@ -6,6 +6,14 @@ export const colors = {
   accent: '#83C344',         // Verde lima del logo
   accentDark: '#6BA136',
 
+  // Gradients
+  uiGradients: {
+    primary: ['#3D8FEF', '#005AC1'],        // Botones principales (Azul vibrante a oscuro)
+    vacation: ['#60A5FA', '#3B82F6'],       // Vacaciones (Azul suave)
+    admin: ['#94A3B8', '#475569'],          // Admin (Gris oscuro/azulado)
+    action: ['#34D399', '#059669'],         // Fichar (Verde)
+  },
+
   // Shifts
   morning: '#FFB300',        // Amarillo Mañana
   morningLight: '#FFF8E1',
@@ -28,7 +36,7 @@ export const colors = {
 
   // Neutrals
   white: '#FFFFFF',
-  background: '#F8FAFC',
+  background: '#FFFFFF',     // Fondo limpio
   surface: '#FFFFFF',
   border: '#E2E8F0',
   textPrimary: '#1E293B',

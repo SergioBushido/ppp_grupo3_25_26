@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   approveBtn: {
-    backgroundColor: colors.approved,
+    backgroundColor: colors.primary,
   },
   rejectBtn: {
     backgroundColor: colors.rejected,

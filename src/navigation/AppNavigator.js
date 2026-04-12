@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -13,7 +14,6 @@ import AdminScreen from '../screens/AdminScreen';
 
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
-import { useSafeAreaInsets, SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -30,16 +30,21 @@ function MainTabs() {
           backgroundColor: colors.white,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 60 + insets.bottom,  
-          paddingBottom: insets.bottom, 
-          paddingTop: 5,
+          height: 65 + insets.bottom,
+          paddingBottom: 10 + insets.bottom,
+          paddingTop: 8,
+          elevation: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
-
           fontSize: typography.sizes.xs,
-          fontWeight: typography.weights.semibold,
+          fontWeight: typography.weights.bold,
+          marginTop: 2,
         },
       }}
     >
@@ -49,7 +54,7 @@ function MainTabs() {
         options={{
           tabBarLabel: 'Inicio',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home" size={size} color={color} />
+            <MaterialCommunityIcons name="home" size={28} color={color} />
           ),
         }}
       />
@@ -59,7 +64,7 @@ function MainTabs() {
         options={{
           tabBarLabel: 'Horario',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="clock-outline" size={size} color={color} />
+            <MaterialCommunityIcons name="clock-outline" size={26} color={color} />
           ),
         }}
       />
@@ -69,17 +74,17 @@ function MainTabs() {
         options={{
           tabBarLabel: 'Vacaciones',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="tree-outline" size={size} color={color} />
+            <MaterialCommunityIcons name="umbrella-beach" size={26} color={color} />
           ),
         }}
       />
       <Tab.Screen
         name="Settings"
-        component={HomeScreen} // Placeholder
+        component={HomeScreen} // Reutilizamos HomeScreen
         options={{
           tabBarLabel: 'Ajustes',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="cog-outline" size={size} color={color} />
+            <MaterialCommunityIcons name="cog-outline" size={26} color={color} />
           ),
         }}
       />
@@ -88,14 +93,10 @@ function MainTabs() {
           name="Admin"
           component={AdminScreen}
           options={{
-            tabBarLabel: 'Admin',
-            tabBarIcon: ({ color, size }) => (
-              <MaterialCommunityIcons name="shield-crown" size={size} color={color} />
-            ),
+            tabBarButton: () => null, // Ocultar el botón visual
           }}
         />
       )}
-
     </Tab.Navigator>
   );
 }
