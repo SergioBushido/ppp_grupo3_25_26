@@ -5,6 +5,9 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ## 🚀 Próximas Tareas (Pendientes)
 
 ### Diseño y Experiencia de Usuario (UI/UX)
+- [ ] **Issue #19 - Pantalla de Ajustes de Usuario (Settings):** 
+  - *Descripción:* Crear una pantalla independiente `SettingsScreen` accesible desde la Tab Bar. Migrar allí las opciones de "Cerrar sesión", el recuadro para "Cambiar contraseña" y mostrar información útil del perfil del usuario (nombre, rol y resumen de días disponibles). Esto limpiará completamente el `HomeScreen`.
+  - *Prioridad:* Alta.
 - [ ] **Issue #10 - Navegación Premium:** 
   - *Descripción:* Iconos sólidos en la Tab Bar y destaque del botón central.
   - *Prioridad:* Media.
