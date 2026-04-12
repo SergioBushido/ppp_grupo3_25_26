@@ -10,6 +10,7 @@ import CalendarScreen from '../screens/CalendarScreen';
 import VacationsScreen from '../screens/VacationsScreen';
 import RequestVacationScreen from '../screens/RequestVacationScreen';
 import AdminScreen from '../screens/AdminScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
@@ -78,7 +79,7 @@ function MainTabs() {
       />
       <Tab.Screen
         name="Settings"
-        component={HomeScreen} // Reutilizamos HomeScreen temporalmente para mostrar el perfil
+        component={SettingsScreen}
         options={{
           tabBarLabel: 'Ajustes',
           tabBarIcon: ({ color, size }) => (
