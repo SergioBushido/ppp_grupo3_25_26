@@ -8,9 +8,6 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 - [ ] **Issue #19 - Pantalla de Ajustes de Usuario (Settings):** 
   - *Descripción:* Crear una pantalla independiente `SettingsScreen` accesible desde la Tab Bar. Migrar allí las opciones de "Cerrar sesión", el recuadro para "Cambiar contraseña" y mostrar información útil del perfil del usuario (nombre, rol y resumen de días disponibles). Esto limpiará completamente el `HomeScreen`.
   - *Prioridad:* Alta.
-- [ ] **Issue #10 - Navegación Premium:** 
-  - *Descripción:* Iconos sólidos en la Tab Bar y destaque del botón central.
-  - *Prioridad:* Media.
 
 ### Funcionalidades Core
 - [ ] **Issue #13 - Registro de Jornada (Fichaje):** 
@@ -43,6 +40,10 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 
 ## ✅ Tareas Completadas
 - [x] **Issue #9 - Rediseño del Dashboard:** Pantalla de inicio minimalista con botones degradados (`expo-linear-gradient`).
+- [x] **Issue #10 - Navegación Premium:** Iconos con estados personalizados, indicadores de pestaña activa y botón de Vacaciones destacado en rojo.
+- [x] **BugFix - Espaciado en Tab Bar:** 
+  - *Incidencia:* Los iconos aparecían desplazados a la izquierda y no se centraban correctamente a pesar de los estilos. Se descubrió que la pestaña `Admin` (oculta con `tabBarButton: () => null`) seguía consumiendo espacio en el layout del Tab Navigator.
+  - *Solución:* Se extrajo `AdminScreen` del `Tab.Navigator` y se movió al `Stack.Navigator` principal. Esto liberó el espacio y permitió que las 4 pestañas visibles se distribuyeran de forma equidistante y centrada.
 - [x] **BugFix - Navegación y Carga del Panel Admin:** 
   - *Incidencia:* Error `The action 'NAVIGATE' with payload {"name":"Admin"} was not handled by any navigator` al pulsar el botón desde Home, seguido de un problema donde los datos de administración no se cargaban.
   - *Solución:* Se reintegró `AdminScreen` al `MainTabs` con el botón oculto (`tabBarButton: () => null`) para preservar la visibilidad del menú inferior. Se añadió `useFocusEffect` en `AdminScreen` para forzar la recarga de datos de la base de datos al mostrar la pestaña, en lugar de usar un `useEffect` que solo cargaba una vez en segundo plano.

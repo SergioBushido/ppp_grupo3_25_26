@@ -25,6 +25,7 @@ export const colors = {
   // Status
   vacation: '#F06292',       // Rosa vacaciones
   vacationLight: '#FCE4EC',
+  vacationBrand: '#EF4444',    // Rojo vibrante para el botón de la Tab Bar
   free: '#43A047',           // Verde Libre
   freeLight: '#E8F5E9',
   pending: '#F59E0B',
