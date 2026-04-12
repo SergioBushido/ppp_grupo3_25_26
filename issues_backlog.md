@@ -5,9 +5,6 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ## 🚀 Próximas Tareas (Pendientes)
 
 ### Diseño y Experiencia de Usuario (UI/UX)
-- [ ] **Issue #9 - Rediseño del Dashboard:** 
-  - *Descripción:* Aplicar `expo-linear-gradient` para crear botones modernos con degradados y sombras suaves.
-  - *Prioridad:* Alta (Impacto visual).
 - [ ] **Issue #10 - Navegación Premium:** 
   - *Descripción:* Iconos sólidos en la Tab Bar y destaque del botón central.
   - *Prioridad:* Media.
@@ -34,9 +31,18 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Descripción:* Configurar Jest y realizar tests de lógica de negocio.
   - *Prioridad:* Media.
 
+### Seguridad y Autenticación
+- [ ] **Issue #18 - Migración a Supabase Auth:** 
+  - *Descripción:* Implementar el sistema nativo de Supabase Auth para gestionar usuarios, sesiones persistentes y encriptación de contraseñas, vinculando el `UID` de Auth con la tabla `employees`.
+  - *Prioridad:* Media.
+
 ---
 
 ## ✅ Tareas Completadas
+- [x] **Issue #9 - Rediseño del Dashboard:** Pantalla de inicio minimalista con botones degradados (`expo-linear-gradient`).
+- [x] **BugFix - Navegación y Carga del Panel Admin:** 
+  - *Incidencia:* Error `The action 'NAVIGATE' with payload {"name":"Admin"} was not handled by any navigator` al pulsar el botón desde Home, seguido de un problema donde los datos de administración no se cargaban.
+  - *Solución:* Se reintegró `AdminScreen` al `MainTabs` con el botón oculto (`tabBarButton: () => null`) para preservar la visibilidad del menú inferior. Se añadió `useFocusEffect` en `AdminScreen` para forzar la recarga de datos de la base de datos al mostrar la pestaña, en lugar de usar un `useEffect` que solo cargaba una vez en segundo plano.
 - [x] **Issue #8:** Asignación masiva de turnos mediante calendario interactivo.
 - [x] **Issue #15:** Selector táctil de vacaciones para empleados.
 - [x] **Migración a Supabase:** Sincronización en tiempo real finalizada.

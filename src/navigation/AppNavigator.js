@@ -28,15 +28,21 @@ function MainTabs() {
           backgroundColor: colors.white,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 6,
+          height: 65,
+          paddingBottom: 10,
+          paddingTop: 8,
+          elevation: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
           fontSize: typography.sizes.xs,
-          fontWeight: typography.weights.semibold,
+          fontWeight: typography.weights.bold,
+          marginTop: 2,
         },
       }}
     >
@@ -46,7 +52,7 @@ function MainTabs() {
         options={{
           tabBarLabel: 'Inicio',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home" size={size} color={color} />
+            <MaterialCommunityIcons name="home" size={28} color={color} />
           ),
         }}
       />
@@ -56,7 +62,7 @@ function MainTabs() {
         options={{
           tabBarLabel: 'Horario',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="clock-outline" size={size} color={color} />
+            <MaterialCommunityIcons name="clock-outline" size={26} color={color} />
           ),
         }}
       />
@@ -66,32 +72,27 @@ function MainTabs() {
         options={{
           tabBarLabel: 'Vacaciones',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="tree-outline" size={size} color={color} />
+            <MaterialCommunityIcons name="umbrella-beach" size={26} color={color} />
           ),
         }}
       />
       <Tab.Screen
         name="Settings"
-        component={HomeScreen} // Placeholder
+        component={HomeScreen} // Reutilizamos HomeScreen temporalmente para mostrar el perfil
         options={{
           tabBarLabel: 'Ajustes',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="cog-outline" size={size} color={color} />
+            <MaterialCommunityIcons name="cog-outline" size={26} color={color} />
           ),
         }}
       />
-      {user?.role === 'admin' && (
-        <Tab.Screen
-          name="Admin"
-          component={AdminScreen}
-          options={{
-            tabBarLabel: 'Admin',
-            tabBarIcon: ({ color, size }) => (
-              <MaterialCommunityIcons name="shield-crown" size={size} color={color} />
-            ),
-          }}
-        />
-      )}
+      <Tab.Screen
+        name="Admin"
+        component={AdminScreen}
+        options={{
+          tabBarButton: () => null, // Ocultar el botón visual
+        }}
+      />
     </Tab.Navigator>
   );
 }

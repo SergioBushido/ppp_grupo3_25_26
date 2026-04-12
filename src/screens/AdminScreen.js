@@ -108,18 +108,33 @@ export default function AdminScreen() {
   const [reportMonth, setReportMonth] = useState(new Date());
   const [reportData, setReportData] = useState([]);
 
+  const { useFocusEffect } = require('@react-navigation/native');
+
   const loadAll = useCallback(async () => {
     setLoading(true);
-    const [pending, all, emps] = await Promise.all([
-      getAllPendingVacations(),
-      getAllVacations(),
-      getAllEmployees(),
-    ]);
-    setPendingVacations(pending);
-    setAllVacations(all);
-    setEmployees(emps.filter((e) => e.role === 'employee'));
-    setLoading(false);
+    try {
+      const [pending, all, emps] = await Promise.all([
+        getAllPendingVacations(),
+        getAllVacations(),
+        getAllEmployees(),
+      ]);
+      setPendingVacations(pending);
+      setAllVacations(all);
+      setEmployees(emps.filter((e) => e.role === 'employee'));
+    } catch (e) {
+      console.error("Error loading Admin data:", e);
+      Alert.alert("Error", "No se pudieron cargar los datos del panel.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAll();
+      loadDayShifts();
+    }, [loadAll, loadDayShifts])
+  );
 
   const loadDayShifts = useCallback(async () => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -178,8 +193,7 @@ export default function AdminScreen() {
     }
   }, [reportMonth]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
-  useEffect(() => { loadDayShifts(); }, [loadDayShifts]);
+
   useEffect(() => {
     if (activeTab === 'reports') {
       loadReportData();
