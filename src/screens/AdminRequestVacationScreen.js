@@ -14,7 +14,7 @@ import { format, addDays, differenceInCalendarDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { useAuth } from '../context/AuthContext';
-import { requestVacation } from '../database/vacationService';
+import { editRequestVacation } from '../database/vacationService';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 
@@ -27,23 +27,36 @@ LocaleConfig.locales['es'] = {
 };
 LocaleConfig.defaultLocale = 'es';
 
-export default function RequestVacationScreen({ navigation }) {
+export default function AdminRequestVacationScreen({ navigation, route }) {
   const { user, refreshUser } = useAuth();
+  const employeeVacation = route?.params;
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const [startDate, setStartDate] = useState(
+    employeeVacation?.start_date
+      ? new Date(employeeVacation.start_date)
+      : null
+  );
 
-  console.log(onDayPress);
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
-  const [reason, setReason] = useState('');
+  const [endDate, setEndDate] = useState(
+    employeeVacation?.end_date
+      ? new Date(employeeVacation.end_date)
+      : null
+  );
+
+
+  const oldAvailableDays = differenceInCalendarDays((employeeVacation?.end_date), (employeeVacation?.start_date)) + 1 + employeeVacation?.employees.available_days;
+  const newAvailableDays = differenceInCalendarDays((employeeVacation?.end_date), (employeeVacation?.start_date)) + 1 + employeeVacation?.employees.available_days;
+
   const [loading, setLoading] = useState(false);
 
   // Consideramos las vacaciones desde startDate hasta endDate incluídos
   const effectiveEnd = endDate || startDate;
   const days = startDate ? differenceInCalendarDays(effectiveEnd, startDate) + 1 : 0;
   // Solo se puede tramitar si hay al menos un día válido seleccionado, y entra en el saldo.
-  const canRequest = days > 0 && effectiveEnd >= startDate && days <= (user?.available_days ?? 0) && startDate >= today;
+  const canRequest = days > 0 && effectiveEnd >= startDate && days <= (newAvailableDays ?? 0) && startDate >= today;
 
   const onDayPress = (day) => {
     const date = parseISO(day.dateString);
@@ -77,17 +90,17 @@ export default function RequestVacationScreen({ navigation }) {
     } else if (startDate && endDate) {
       const sStr = format(startDate, 'yyyy-MM-dd');
       const eStr = format(endDate, 'yyyy-MM-dd');
-      
+
       if (sStr === eStr) {
         dates[sStr] = { startingDay: true, endingDay: true, color: colors.vacation, textColor: 'white' };
       } else {
         dates[sStr] = { startingDay: true, color: colors.vacation, textColor: 'white' };
         dates[eStr] = { endingDay: true, color: colors.vacation, textColor: 'white' };
-        
+
         let cur = addDays(startDate, 1);
         while (cur < endDate) {
-           dates[format(cur, 'yyyy-MM-dd')] = { color: colors.vacationLight, textColor: colors.primary };
-           cur = addDays(cur, 1);
+          dates[format(cur, 'yyyy-MM-dd')] = { color: colors.vacationLight, textColor: colors.primary };
+          cur = addDays(cur, 1);
         }
       }
     }
@@ -98,16 +111,19 @@ export default function RequestVacationScreen({ navigation }) {
     if (!canRequest) return;
     setLoading(true);
     try {
-      await requestVacation({
-        employee_id: user.id,
+      await editRequestVacation({
+        vacation_id: employeeVacation?.id,
+        employee_id: employeeVacation?.employee_id,
         start_date: format(startDate, 'yyyy-MM-dd'),
         end_date: format(effectiveEnd, 'yyyy-MM-dd'),
-        reason: reason.trim() || null,
+        old_available_days: oldAvailableDays
       });
+
       await refreshUser();
+
       Alert.alert(
-        '✅ Solicitud enviada',
-        'Tu solicitud ha sido enviada al administrador para su revisión.',
+        'Edición exitosa',
+        'Las vacaciones se han editado correctamente',
         [{ text: 'Aceptar', onPress: () => navigation.goBack() }]
       );
     } catch (e) {
@@ -120,21 +136,38 @@ export default function RequestVacationScreen({ navigation }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header summary */}
+      <View style={styles.summary}>
+        <View style={styles.summaryDetails}>
+          <MaterialCommunityIcons name="account" size={30} color={colors.textSecondary} />
+          <Text style={styles.summaryText}>{employeeVacation.employees.name}</Text>
+        </View>
+        <View style={styles.summaryDetails}>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', backgroundColor: colors.white, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+            <Text style={{ fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
+              {format(employeeVacation?.start_date, "d MMM", { locale: es })}
+            </Text>
+            <MaterialCommunityIcons name="arrow-right" size={16} color={colors.textMuted} style={{ marginHorizontal: 12 }} />
+            <Text style={{ fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
+              {format(employeeVacation?.end_date, "d MMM yyyy", { locale: es })}
+            </Text>
+          </View>
+        </View>
+      </View>
+
       <View style={styles.summaryCard}>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryNumber}>{days}</Text>
           <Text style={styles.summaryLabel}>Días solicitados</Text>
         </View>
-        <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryNumber, days > (user?.available_days ?? 0) && styles.summaryNumberDanger]}>
-            {(user?.available_days ?? 0) - (canRequest ? days : 0)}
+          <Text style={[styles.summaryNumber, days > (newAvailableDays ?? 0) && styles.summaryNumberDanger]}>
+            {(newAvailableDays ?? 0) - (canRequest ? days : 0)}
           </Text>
           <Text style={styles.summaryLabel}>Quedarían disponibles</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryNumber}>{user?.available_days ?? 0}</Text>
+          <Text style={styles.summaryNumber}>{newAvailableDays}</Text>
           <Text style={styles.summaryLabel}>Días disponibles</Text>
         </View>
       </View>
@@ -142,7 +175,7 @@ export default function RequestVacationScreen({ navigation }) {
       {/* Date selectors */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Seleccionar Período</Text>
-        <Text style={{fontSize: typography.sizes.xs, color: colors.textSecondary, marginBottom: 8}}>
+        <Text style={{ fontSize: typography.sizes.xs, color: colors.textSecondary, marginBottom: 8 }}>
           Toca en la cuadrícula el primer día y luego el último día de tus vacaciones. Si tocas un solo día dos veces, será de un día. Solo se permiten fechas futuras.
         </Text>
         <Calendar
@@ -158,19 +191,19 @@ export default function RequestVacationScreen({ navigation }) {
             textMonthFontWeight: 'bold',
             textDayHeaderFontWeight: 'bold',
           }}
-          style={{borderRadius: 16, borderWidth: 1, borderColor: colors.border, paddingBottom: 10}}
+          style={{ borderRadius: 16, borderWidth: 1, borderColor: colors.border, paddingBottom: 10 }}
         />
         {(startDate || endDate) && (
-          <View style={{flexDirection: 'row', justifyContent: 'center', marginTop: 12, backgroundColor: colors.white, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border}}>
-            <Text style={{fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold}}>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 12, backgroundColor: colors.white, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+            <Text style={{ fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
               {format(startDate, "d MMM", { locale: es })}
             </Text>
             {startDate && endDate && startDate !== endDate && (
               <>
-               <MaterialCommunityIcons name="arrow-right" size={16} color={colors.textMuted} style={{marginHorizontal: 12}} />
-               <Text style={{fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold}}>
-                 {format(endDate, "d MMM yyyy", { locale: es })}
-               </Text>
+                <MaterialCommunityIcons name="arrow-right" size={16} color={colors.textMuted} style={{ marginHorizontal: 12 }} />
+                <Text style={{ fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
+                  {format(endDate, "d MMM yyyy", { locale: es })}
+                </Text>
               </>
             )}
           </View>
@@ -178,31 +211,34 @@ export default function RequestVacationScreen({ navigation }) {
       </View>
 
       {/* Warning if not enough days */}
-      {days > (user?.available_days ?? 0) && (
+      {days > (newAvailableDays) && (
         <View style={styles.warningBox}>
           <MaterialCommunityIcons name="alert" size={16} color={colors.rejected} />
           <Text style={styles.warningText}>
-            No tienes suficientes días. Necesitas {days} pero tienes {user?.available_days ?? 0}.
+            No tienes suficientes días. Necesitas {days} pero tienes {newAvailableDays}.
           </Text>
         </View>
       )}
 
       {/* Reason */}
+
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Motivo (opcional)</Text>
+        <Text style={styles.sectionTitle}>Motivo</Text>
         <View style={styles.card}>
-          <TextInput
+          <Text
             style={styles.reasonInput}
             placeholder="Ej: Vacaciones familiares, descanso..."
             placeholderTextColor={colors.textMuted}
-            value={reason}
-            onChangeText={setReason}
+
             multiline
             numberOfLines={3}
             textAlignVertical="top"
-          />
+          >
+            {employeeVacation?.reason}
+          </Text>
         </View>
       </View>
+
 
       {/* Submit */}
       <TouchableOpacity
@@ -215,7 +251,7 @@ export default function RequestVacationScreen({ navigation }) {
         ) : (
           <>
             <MaterialCommunityIcons name="send" size={20} color={colors.white} />
-            <Text style={styles.submitBtnText}>Enviar solicitud</Text>
+            <Text style={styles.submitBtnText}>Editar vacaciones</Text>
           </>
         )}
       </TouchableOpacity>
@@ -232,6 +268,20 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 20,
     paddingBottom: 40,
+  },
+  summary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  summaryDetails: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  summaryText: {
+    fontSize: typography.sizes.xl
   },
   summaryCard: {
     backgroundColor: colors.primary,
