@@ -18,7 +18,8 @@ export async function getAllVacations() {
     .select(`
       *,
       employees (
-        name
+        name, 
+        available_days
       )
     `)
     .order('requested_at', { ascending: false });
@@ -27,7 +28,8 @@ export async function getAllVacations() {
   
   return data.map(v => ({
     ...v,
-    employee_name: v.employees?.name
+    employee_name: v.employees?.name,
+    employee_available_days: v.employees?.available_days
   }));
 }
 
@@ -92,6 +94,48 @@ export async function requestVacation({ employee_id, start_date, end_date, reaso
   return data.id;
 }
 
+
+export async function editRequestVacation({ vacation_id, employee_id, start_date, end_date, available_days }) {
+  
+  const newDays = differenceInCalendarDays(parseISO(end_date), parseISO(start_date)) + 1;
+
+  const newAvailableDays =  available_days - newDays
+
+  // Check available days
+  const { data: emp, error: empError } = await supabase
+    .from('employees')
+    .select('available_days')
+    .eq('id', employee_id)
+    .single();
+
+  if (empError || !emp) throw new Error('Empleado no encontrado');
+  
+  if (available_days < newDays) {
+    throw new Error(`No tienes suficientes días disponibles. Necesitas ${days}, tienes ${emp.available_days}.`);
+  }
+
+  //Actualizar días
+  const { data: employeeData, error: employeeError } = await supabase
+    .from('employees')
+    .update([{available_days: newAvailableDays}])
+    .eq('id', employee_id)
+    .select()  
+    .single();
+
+  if (employeeError) throw employeeError;
+
+    const { data: vacationData, error: vacationError } = await supabase
+    .from('vacations')
+    .update([{ start_date, end_date}])
+    .eq('id', vacation_id)
+    .select()
+    .single();
+  
+  if (vacationError) throw vacationError;
+
+  return employeeData.id;
+}
+
 export async function approveVacation(vacationId) {
   // Obtener detalles de la vacación
   const { data: vacation, error: vError } = await supabase
@@ -128,6 +172,8 @@ export async function approveVacation(vacationId) {
   }
 }
 
+
+// Rechazar cuando la solicitud esta pendiente
 export async function rejectVacation(vacationId) {
   const { error } = await supabase
     .from('vacations')
@@ -140,6 +186,47 @@ export async function rejectVacation(vacationId) {
   if (error) throw error;
 }
 
+
+// Cancelar la vacacion cuando esta aprobada
+export async function cancelVacation(vacation) {
+
+  const days = differenceInCalendarDays(parseISO(vacation.end_date), parseISO(vacation.start_date)) + 1;
+
+  const { error: vacationError } = await supabase
+    .from('vacations')
+    .update({ 
+      status: 'pending', 
+      reviewed_at: new Date().toISOString() 
+    })
+    .eq('id', vacation.id);
+  
+  if (vacationError) throw vacationError;
+
+  const { error: employeeError } = await supabase
+    .from('employees')
+    .update({ 
+      available_days: vacation.employees.available_days + days, 
+    })
+    .eq('id', vacation.employee_id);
+  
+  if (employeeError) throw employeeError;
+}
+
+// Reactivar la vacación cuando esta rechazada (rejected)
+export async function reactiveVacation(vacationId) {
+
+  const { error: vacationError } = await supabase
+    .from('vacations')
+    .update({ 
+      status: 'pending', 
+      reviewed_at: new Date().toISOString() 
+    })
+    .eq('id', vacationId);
+  
+  if (vacationError) throw vacationError;
+}
+
+// Borrar la vacacion cuando la solicitud vacaciones esta rechazada (rejected)
 export async function deleteVacation(vacationId) {
   const { error } = await supabase
     .from('vacations')

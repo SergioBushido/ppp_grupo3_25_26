@@ -5,6 +5,7 @@ import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { useNavigation } from '@react-navigation/native'
 
 const STATUS_CONFIG = {
   pending: { label: 'Pendiente', color: colors.pending, bg: colors.pendingLight, icon: 'clock-outline' },
@@ -12,12 +13,16 @@ const STATUS_CONFIG = {
   rejected: { label: 'Rechazada', color: colors.rejected, bg: colors.rejectedLight, icon: 'close-circle-outline' },
 };
 
-export function VacationCard({ vacation, isAdmin = false, onApprove, onReject }) {
+export function VacationCard({ vacation, isAdmin = false, onApprove, onReject, onCancel, onReactive, onDelete }) {
   const status = STATUS_CONFIG[vacation.status] || STATUS_CONFIG.pending;
   const days = differenceInCalendarDays(parseISO(vacation.end_date), parseISO(vacation.start_date)) + 1;
 
   const startFormatted = format(parseISO(vacation.start_date), "d MMM yyyy", { locale: es });
   const endFormatted = format(parseISO(vacation.end_date), "d MMM yyyy", { locale: es });
+
+  const navigation = useNavigation()
+
+  
 
   return (
     <View style={styles.card}>
@@ -50,6 +55,48 @@ export function VacationCard({ vacation, isAdmin = false, onApprove, onReject })
           </View>
         ) : null}
       </View>
+
+      {isAdmin && vacation.status === 'approved' && (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.editBtn]}
+            onPress={() => navigation.navigate("AdminRequestVacation", vacation)}
+          >
+            <MaterialCommunityIcons name="pencil" size={16} color={colors.white} />
+            <Text style={styles.actionBtnText}>Editar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.rejectBtn]}
+            onPress={() => onCancel?.(vacation)}
+          >
+            <MaterialCommunityIcons name="close" size={16} color={colors.white} />
+            <Text style={styles.actionBtnText}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+
+      )}
+
+      {isAdmin && vacation.status === 'rejected' && (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.primaryBtn, {flex: 2}]}
+            onPress={() => onReactive?.(vacation.id)}
+          >
+            <MaterialCommunityIcons name="restore" size={16} color={colors.white} />
+            <Text style={styles.actionBtnText}>Reactivar</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.rejectBtn, {flex: 1}]}
+            onPress={() => onDelete?.(vacation.id)}
+          >
+            <MaterialCommunityIcons name="delete" size={16} color={colors.white} />
+            <Text style={styles.actionBtnText}>Eliminar</Text>
+          </TouchableOpacity>
+        </View>
+
+      )}
+
 
       {isAdmin && vacation.status === 'pending' && (
         <View style={styles.actions}>
@@ -141,11 +188,17 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 10,
   },
+  primaryBtn: {
+    backgroundColor: colors.primary,
+  },
   approveBtn: {
     backgroundColor: colors.primary,
   },
   rejectBtn: {
     backgroundColor: colors.rejected,
+  },
+  editBtn: {
+    backgroundColor: colors.pending,
   },
   actionBtnText: {
     color: colors.white,

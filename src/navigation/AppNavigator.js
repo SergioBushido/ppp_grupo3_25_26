@@ -11,6 +11,7 @@ import HomeScreen from '../screens/HomeScreen';
 import CalendarScreen from '../screens/CalendarScreen';
 import VacationsScreen from '../screens/VacationsScreen';
 import RequestVacationScreen from '../screens/RequestVacationScreen';
+import AdminRequestVacationScreen from '../screens/AdminRequestVacationScreen';
 import AdminScreen from '../screens/AdminScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
@@ -135,6 +136,18 @@ export default function AppNavigator() {
             options={{
               headerShown: true,
               title: 'Solicitar Vacaciones',
+              headerStyle: { backgroundColor: colors.primary },
+              headerTintColor: colors.white,
+              headerTitleStyle: { fontWeight: typography.weights.bold },
+              presentation: 'modal',
+            }}
+          />
+          <Stack.Screen
+            name="AdminRequestVacation"
+            component={AdminRequestVacationScreen}
+            options={{
+              headerShown: true,
+              title: 'Editar Vacaciones',
               headerStyle: { backgroundColor: colors.primary },
               headerTintColor: colors.white,
               headerTitleStyle: { fontWeight: typography.weights.bold },
