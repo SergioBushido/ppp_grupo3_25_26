@@ -17,6 +17,24 @@ export async function getShiftsByEmployee(employeeId) {
   return data;
 }
 
+export async function getTodayShiftForEmployee(employeeId) {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const dateStr = `${year}-${month}-${day}`;
+
+  const { data, error } = await supabase
+    .from('shifts')
+    .select('*')
+    .eq('employee_id', employeeId)
+    .eq('date', dateStr)
+    .maybeSingle();
+  
+  if (error) throw error;
+  return data;
+}
+
 export async function getShiftsForMonth(year, month) {
   const monthStr = String(month).padStart(2, '0');
   const startDate = `${year}-${monthStr}-01`;
