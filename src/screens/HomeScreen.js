@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,10 @@ import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import { getTodayAttendance, registerAttendance } from '../database/attendanceService';
+import { getTodayShiftForEmployee } from '../database/shiftService';
+import { getShiftConfig } from '../components/ShiftBadge';
 
 const MenuButton = ({ title, icon, gradientColors, onPress }) => (
   <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={styles.buttonContainer}>
@@ -33,11 +37,107 @@ const MenuButton = ({ title, icon, gradientColors, onPress }) => (
 
 export default function HomeScreen({ navigation }) {
   const { user } = useAuth();
+  const [attendanceRecords, setAttendanceRecords] = useState(null);
+  const [todayShift, setTodayShift] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadHomeData = useCallback(async () => {
+    if (!user) return;
+    try {
+      setIsLoading(true);
+      const [records, shift] = await Promise.all([
+        getTodayAttendance(user.id),
+        getTodayShiftForEmployee(user.id)
+      ]);
+      setAttendanceRecords(records);
+      setTodayShift(shift);
+    } catch (error) {
+      console.error('Error al cargar datos:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadHomeData();
+    }, [loadHomeData])
+  );
+
+  const handleFichaje = async () => {
+    if (!attendanceRecords || isLoading) return;
+
+    const hasIn = attendanceRecords.some(r => r.type === 'in');
+    const hasOut = attendanceRecords.some(r => r.type === 'out');
+
+    if (hasIn && hasOut) {
+      Alert.alert('Jornada Completada', 'Ya has registrado tu entrada y salida por hoy.');
+      return;
+    }
+
+    const type = !hasIn ? 'in' : 'out';
+    const actionName = type === 'in' ? 'Entrada' : 'Salida';
+
+    Alert.alert(
+      `Registrar ${actionName}`,
+      `¿Confirmas registrar tu ${actionName.toLowerCase()} en este momento?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Confirmar', 
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              await registerAttendance(user.id, type);
+              await loadHomeData();
+              Alert.alert('Éxito', `${actionName} registrada correctamente.`);
+            } catch (error) {
+              console.error(error);
+              Alert.alert('Error', error.message || 'Error al registrar el fichaje.');
+              setIsLoading(false);
+            }
+          } 
+        }
+      ]
+    );
+  };
+
+  const getFichajeState = () => {
+    if (isLoading || !attendanceRecords) {
+      return { title: 'Cargando...', icon: 'clock-outline', gradient: colors.uiGradients.action };
+    }
+    const hasIn = attendanceRecords.some(r => r.type === 'in');
+    const hasOut = attendanceRecords.some(r => r.type === 'out');
+    
+    if (!hasIn) return { title: 'Registrar Entrada', icon: 'login', gradient: colors.uiGradients.action }; // Verde
+    if (hasIn && !hasOut) return { title: 'Registrar Salida', icon: 'logout', gradient: ['#F59E0B', '#D97706'] }; // Naranja
+    return { title: 'Jornada Completada', icon: 'check-circle-outline', gradient: ['#9CA3AF', '#6B7280'] }; // Gris
+  };
+
+  const fichajeState = getFichajeState();
+
+  const renderTodayShift = () => {
+    if (isLoading) return <Text style={styles.todayShiftText}>Cargando turno...</Text>;
+    if (!todayShift) return <Text style={styles.todayShiftText}>Hoy no tienes turno asignado.</Text>;
+    
+    const config = getShiftConfig(todayShift.shift_type);
+    const timeText = (todayShift.start_time && todayShift.end_time) 
+      ? `(${todayShift.start_time.substring(0, 5)} - ${todayShift.end_time.substring(0, 5)})` 
+      : '';
+
+    return (
+      <View style={styles.todayShiftContainer}>
+         <MaterialCommunityIcons name={config.icon} size={16} color={colors.white} />
+         <Text style={styles.todayShiftText}>Hoy: {config.label} {timeText}</Text>
+      </View>
+    );
+  };
   
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Inicio</Text>
+        {renderTodayShift()}
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -54,10 +154,10 @@ export default function HomeScreen({ navigation }) {
           onPress={() => navigation.navigate('Vacations')}
         />
         <MenuButton
-          title="Fichar Entrada/Salida"
-          icon="clock-check-outline"
-          gradientColors={colors.uiGradients.action}
-          onPress={() => Alert.alert('Próximamente', 'Funcionalidad de fichaje en desarrollo')}
+          title={fichajeState.title}
+          icon={fichajeState.icon}
+          gradientColors={fichajeState.gradient}
+          onPress={handleFichaje}
         />
         {user?.role === 'admin' && (
           <MenuButton
@@ -78,15 +178,39 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    paddingVertical: 20,
+    backgroundColor: colors.primary,
+    paddingVertical: 25,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   headerTitle: {
     fontSize: typography.sizes.xxl,
     fontWeight: typography.weights.bold,
-    color: colors.textPrimary,
+    color: colors.white,
+    marginBottom: 8,
+  },
+  todayShiftContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  todayShiftText: {
+    color: colors.white,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
   },
   content: {
     paddingHorizontal: 24,
