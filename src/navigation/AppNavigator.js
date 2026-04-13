@@ -14,6 +14,7 @@ import RequestVacationScreen from '../screens/RequestVacationScreen';
 import AdminRequestVacationScreen from '../screens/AdminRequestVacationScreen';
 import AdminScreen from '../screens/AdminScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import ForcePasswordChangeScreen from '../screens/ForcePasswordChangeScreen';
 
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
@@ -122,6 +123,8 @@ export default function AppNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {!user ? (
         <Stack.Screen name="Login" component={LoginScreen} />
+      ) : user.requires_password_change ? (
+        <Stack.Screen name="ForcePasswordChange" component={ForcePasswordChangeScreen} />
       ) : (
         <>
           <Stack.Screen name="Main" component={MainTabs} />
