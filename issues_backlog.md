@@ -4,11 +4,6 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 
 ## 🚀 Próximas Tareas (Pendientes)
 
-### Diseño y Experiencia de Usuario (UI/UX)
-- [ ] **Issue #19 - Pantalla de Ajustes de Usuario (Settings):** 
-  - *Descripción:* Crear una pantalla independiente `SettingsScreen` accesible desde la Tab Bar. Migrar allí las opciones de "Cerrar sesión", el recuadro para "Cambiar contraseña" y mostrar información útil del perfil del usuario (nombre, rol y resumen de días disponibles). Esto limpiará completamente el `HomeScreen`.
-  - *Prioridad:* Alta.
-
 ### Funcionalidades Core
 - [ ] **Issue #13 - Registro de Jornada (Fichaje):** 
   - *Descripción:* Botón de 'Entrada/Salida' que registre eventos en Supabase.
@@ -16,9 +11,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 - [ ] **Issue #16 - Gestión de Vacaciones Aprobadas (Control Admin):** 
   - *Descripción:* Botón para cancelar vacaciones aprobadas y devolver días automáticamente.
   - *Prioridad:* Alta.
-- [ ] **Issue #17 - Reseteo de Contraseñas:** 
-  - *Descripción:* Permitir al admin cambiar la clave de un empleado.
-  - *Prioridad:* Media.
+
 
 ### Reportes e Ingeniería
 - [ ] **Issue #12 - Plantillas Horarias:** 
@@ -39,6 +32,8 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ---
 
 ## ✅ Tareas Completadas
+- [x] **Issue #17 - Reseteo de Contraseñas (Admin):** Panel de reseteo temporal y flujo cautivo de cambio obligatorio.
+- [x] **Issue #19 - Pantalla de Ajustes de Usuario (Settings):** Creada pantalla independiente con gestión de perfil, cambio de contraseña y cierre de sesión. Limpieza del `HomeScreen`.
 - [x] **Issue #9 - Rediseño del Dashboard:** Pantalla de inicio minimalista con botones degradados (`expo-linear-gradient`).
 - [x] **Issue #10 - Navegación Premium:** Iconos con estados personalizados, indicadores de pestaña activa y botón de Vacaciones destacado en rojo.
 - [x] **BugFix - Espaciado en Tab Bar:** 
