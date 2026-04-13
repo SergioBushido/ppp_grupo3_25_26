@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { loginEmployee } from '../database/employeeService';
+import { loginEmployee, getEmployeeById } from '../database/employeeService';
 
 const AuthContext = createContext(null);
 
@@ -35,9 +35,12 @@ export function AuthProvider({ children }) {
 
   const refreshUser = useCallback(async () => {
     if (!user) return;
-    const { getEmployeeById } = await import('../database/employeeService');
-    const updated = await getEmployeeById(user.id);
-    if (updated) setUser(updated);
+    try {
+      const updated = await getEmployeeById(user.id);
+      if (updated) setUser(updated);
+    } catch (e) {
+      console.warn('Error en refreshUser', e);
+    }
   }, [user]);
 
   return (

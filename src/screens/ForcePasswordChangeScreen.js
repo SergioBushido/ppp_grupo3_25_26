@@ -31,12 +31,22 @@ export default function ForcePasswordChangeScreen() {
     try {
       setLoading(true);
       await changePassword(user.id, currentPass, newPass);
-      Alert.alert('✅ Éxito', 'Contraseña actualizada correctamente.');
-      await refreshUser(); // This will fetch the user again, requires_password_change should be false
-    } catch (error) {
-      Alert.alert('Error', error.message || 'No se pudo cambiar la contraseña.');
-    } finally {
       setLoading(false);
+      Alert.alert(
+        '✅ Éxito', 
+        'Contraseña actualizada correctamente.',
+        [
+          { 
+            text: 'Continuar', 
+            onPress: async () => {
+              await refreshUser(); 
+            } 
+          }
+        ]
+      );
+    } catch (error) {
+      setLoading(false);
+      Alert.alert('Error', error.message || 'No se pudo cambiar la contraseña.');
     }
   };
 
