@@ -1,5 +1,11 @@
 import { supabase } from '../lib/supabase';
 
+export const SHIFT_TEMPLATES = {
+  morning: { start_time: '08:00', end_time: '16:00' },
+  afternoon: { start_time: '16:00', end_time: '00:00' },
+  night: { start_time: '00:00', end_time: '08:00' },
+};
+
 export async function getShiftsByEmployee(employeeId) {
   const { data, error } = await supabase
     .from('shifts')
@@ -72,10 +78,21 @@ export async function getTodayShiftForEmployee(employeeId) {
   return data;
 }
 
-export async function createShift({ employee_id, date, shift_type, notes = null }) {
+export async function createShift({ employee_id, date, shift_type, start_time, end_time, notes = null }) {
+  let finalStart = start_time;
+  let finalEnd = end_time;
+
+  if (!finalStart || !finalEnd) {
+    const template = SHIFT_TEMPLATES[shift_type];
+    if (template) {
+      finalStart = template.start_time;
+      finalEnd = template.end_time;
+    }
+  }
+
   const { data, error } = await supabase
     .from('shifts')
-    .insert([{ employee_id, date, shift_type, notes }])
+    .insert([{ employee_id, date, shift_type, start_time: finalStart, end_time: finalEnd, notes }])
     .select()
     .single();
   
@@ -133,14 +150,31 @@ export async function getShiftsInRange(startDate, endDate) {
 }
 
 export async function bulkCreateShifts(shifts) {
-  const { data, error } = await supabase
-    .from('shifts')
-    .insert(shifts.map(({ employee_id, date, shift_type, notes }) => ({
+  const payload = shifts.map(({ employee_id, date, shift_type, start_time, end_time, notes }) => {
+    let finalStart = start_time;
+    let finalEnd = end_time;
+
+    if (!finalStart || !finalEnd) {
+      const template = SHIFT_TEMPLATES[shift_type];
+      if (template) {
+        finalStart = template.start_time;
+        finalEnd = template.end_time;
+      }
+    }
+
+    return {
       employee_id,
       date,
       shift_type,
+      start_time: finalStart,
+      end_time: finalEnd,
       notes
-    })));
+    };
+  });
+
+  const { data, error } = await supabase
+    .from('shifts')
+    .insert(payload);
   
   if (error) throw error;
   return data;
