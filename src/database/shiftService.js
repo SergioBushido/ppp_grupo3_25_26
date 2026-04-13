@@ -163,14 +163,16 @@ export async function bulkCreateShifts(shifts) {
       }
     }
 
-    return {
+    const payloadItem = {
       employee_id,
       date,
       shift_type,
-      start_time: finalStart,
-      end_time: finalEnd,
-      notes
     };
+    if (finalStart !== undefined) payloadItem.start_time = finalStart;
+    if (finalEnd !== undefined) payloadItem.end_time = finalEnd;
+    if (notes !== undefined) payloadItem.notes = notes;
+
+    return payloadItem;
   });
 
   const { data, error } = await supabase

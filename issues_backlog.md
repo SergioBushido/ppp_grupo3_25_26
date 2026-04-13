@@ -8,6 +8,9 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 - [ ] **Issue #16 - Gestión de Vacaciones Aprobadas (Control Admin):** 
   - *Descripción:* Botón para cancelar vacaciones aprobadas y devolver días automáticamente.
   - *Prioridad:* Alta.
+- [ ] **Issue #20 - Rediseño Premium del Monitor de Fichajes:** 
+  - *Descripción:* Transformar la lista de fichajes en un panel con tarjetas, timeline visual, avatares y estados activos ("En el centro").
+  - *Prioridad:* Media.
 
 
 
@@ -44,5 +47,5 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Incidencia:* El modal de asignación de turnos ("pincel") sólo guardaba el 'Día Seleccionado' en lugar de todas las fechas pintadas. Además, no mostraba visualmente los turnos que el empleado ya tenía configurados en la base de datos.
   - *Solución:* Se integró `getShiftsByEmployee` en el componente modal para precargar todo el historial del trabajador seleccionado como `dailyAssignments`. Se refactorizó la lógica en `handleAddShift` para grabar todos los cambios localizados en el `Set` `modifiedAssignmentDates`, resolviendo las inserciones desfasadas.
 - [x] **Issue #8:** Asignación masiva de turnos mediante calendario interactivo.
-- [x] **Issue #20:** Selector táctil de vacaciones para empleados. (Reenumerado para evitar colisión con Issue #15).
+- [x] **Issue #22:** Selector táctil de vacaciones para empleados. (Reenumerado para evitar colisión con Issue #20).
 - [x] **Migración a Supabase:** Sincronización en tiempo real finalizada.

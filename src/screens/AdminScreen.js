@@ -151,6 +151,12 @@ export default function AdminScreen() {
     }, [loadAll, loadDayShifts])
   );
 
+  useEffect(() => {
+    if (activeTab === 'shifts') {
+      loadDayShifts();
+    }
+  }, [selectedDate, activeTab, loadDayShifts]);
+
   const loadDayShifts = useCallback(async () => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const s = await getShiftsByDate(dateStr);
@@ -975,21 +981,26 @@ export default function AdminScreen() {
             </ScrollView>
 
             <Text style={styles.modalLabel}>Pincel (Turno a asignar)</Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
-              <TouchableOpacity onPress={() => setActiveBrush('morning')} style={{ padding: 8, borderRadius: 8, backgroundColor: activeBrush === 'morning' ? colors.morning : colors.white, borderWidth: 1, borderColor: colors.morning }}>
-                <MaterialCommunityIcons name="weather-sunny" size={24} color={activeBrush === 'morning' ? colors.white : colors.morning} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              <TouchableOpacity onPress={() => setActiveBrush('morning')} style={{ flexDirection: 'row', alignItems: 'center', padding: 6, borderRadius: 8, backgroundColor: activeBrush === 'morning' ? colors.morning : colors.white, borderWidth: 1, borderColor: colors.morning }}>
+                <MaterialCommunityIcons name="weather-sunny" size={18} color={activeBrush === 'morning' ? colors.white : colors.morning} />
+                <Text style={{ marginLeft: 4, fontSize: 11, fontWeight: 'bold', color: activeBrush === 'morning' ? colors.white : colors.morning }}>M (08:00-16:00)</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setActiveBrush('afternoon')} style={{ padding: 8, borderRadius: 8, backgroundColor: activeBrush === 'afternoon' ? colors.afternoon : colors.white, borderWidth: 1, borderColor: colors.afternoon }}>
-                <MaterialCommunityIcons name="weather-sunset" size={24} color={activeBrush === 'afternoon' ? colors.white : colors.afternoon} />
+              <TouchableOpacity onPress={() => setActiveBrush('afternoon')} style={{ flexDirection: 'row', alignItems: 'center', padding: 6, borderRadius: 8, backgroundColor: activeBrush === 'afternoon' ? colors.afternoon : colors.white, borderWidth: 1, borderColor: colors.afternoon }}>
+                <MaterialCommunityIcons name="weather-sunset" size={18} color={activeBrush === 'afternoon' ? colors.white : colors.afternoon} />
+                <Text style={{ marginLeft: 4, fontSize: 11, fontWeight: 'bold', color: activeBrush === 'afternoon' ? colors.white : colors.afternoon }}>T (16:00-00:00)</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setActiveBrush('night')} style={{ padding: 8, borderRadius: 8, backgroundColor: activeBrush === 'night' ? colors.night : colors.white, borderWidth: 1, borderColor: colors.night }}>
-                <MaterialCommunityIcons name="weather-night" size={24} color={activeBrush === 'night' ? colors.white : colors.night} />
+              <TouchableOpacity onPress={() => setActiveBrush('night')} style={{ flexDirection: 'row', alignItems: 'center', padding: 6, borderRadius: 8, backgroundColor: activeBrush === 'night' ? colors.night : colors.white, borderWidth: 1, borderColor: colors.night }}>
+                <MaterialCommunityIcons name="weather-night" size={18} color={activeBrush === 'night' ? colors.white : colors.night} />
+                <Text style={{ marginLeft: 4, fontSize: 11, fontWeight: 'bold', color: activeBrush === 'night' ? colors.white : colors.night }}>N (00:00-08:00)</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setActiveBrush('vacation')} style={{ padding: 8, borderRadius: 8, backgroundColor: activeBrush === 'vacation' ? colors.vacation : colors.white, borderWidth: 1, borderColor: colors.vacation }}>
-                <MaterialCommunityIcons name="beach" size={24} color={activeBrush === 'vacation' ? colors.white : colors.vacation} />
+              <TouchableOpacity onPress={() => setActiveBrush('vacation')} style={{ flexDirection: 'row', alignItems: 'center', padding: 6, borderRadius: 8, backgroundColor: activeBrush === 'vacation' ? colors.vacation : colors.white, borderWidth: 1, borderColor: colors.vacation }}>
+                <MaterialCommunityIcons name="beach" size={18} color={activeBrush === 'vacation' ? colors.white : colors.vacation} />
+                <Text style={{ marginLeft: 4, fontSize: 11, fontWeight: 'bold', color: activeBrush === 'vacation' ? colors.white : colors.vacation }}>Vacaciones</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setActiveBrush('none')} style={{ padding: 8, borderRadius: 8, backgroundColor: activeBrush === 'none' ? colors.textSecondary : colors.white, borderWidth: 1, borderColor: colors.textSecondary }}>
-                <MaterialCommunityIcons name="eraser" size={24} color={activeBrush === 'none' ? colors.white : colors.textMuted} />
+              <TouchableOpacity onPress={() => setActiveBrush('none')} style={{ flexDirection: 'row', alignItems: 'center', padding: 6, borderRadius: 8, backgroundColor: activeBrush === 'none' ? colors.textSecondary : colors.white, borderWidth: 1, borderColor: colors.textSecondary }}>
+                <MaterialCommunityIcons name="eraser" size={18} color={activeBrush === 'none' ? colors.white : colors.textMuted} />
+                <Text style={{ marginLeft: 4, fontSize: 11, fontWeight: 'bold', color: activeBrush === 'none' ? colors.white : colors.textMuted }}>Borrar</Text>
               </TouchableOpacity>
             </View>
 
