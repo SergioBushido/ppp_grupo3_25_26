@@ -88,9 +88,24 @@ export async function changePassword(employeeId, currentPassword, newPassword) {
   // If ok, update to new
   const { error } = await supabase
     .from('employees')
-    .update({ password: newPassword })
+    .update({ 
+      password: newPassword,
+      requires_password_change: false 
+    })
     .eq('id', employeeId);
     
   if (error) throw new Error('Error al actualizar la base de datos');
+}
+
+export async function resetEmployeePassword(employeeId, tempPassword) {
+  const { error } = await supabase
+    .from('employees')
+    .update({ 
+      password: tempPassword,
+      requires_password_change: true 
+    })
+    .eq('id', employeeId);
+    
+  if (error) throw new Error('Error al restablecer la contraseña');
 }
 

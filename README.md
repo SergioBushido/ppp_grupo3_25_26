@@ -105,3 +105,15 @@ Siguiendo la línea de diseño premium establecida para el administrador, hemos 
 - **Selección de Rangos (Start-End):** El usuario simplemente toca el día de inicio y el día de fin. El calendario ilumina automáticamente todo el periodo intermedio.
 - **Validación Visual de Cupos:** El sistema calcula y muestra instantáneamente cuántos días se están solicitando y cuántos quedarían en el saldo del empleado antes incluso de enviar la solicitud.
 - **Precisión:** Elimina errores comunes de selección al permitir ver los fines de semana y festivos en la cuadrícula mensual.
+
+---
+
+## 🗄️ Migraciones de Base de Datos (Supabase)
+
+Para el trabajo en equipo y mantener sincronizados los entornos locales/remotos de la base de datos, aquí se documentan los comandos SQL (DDL) necesarios cada vez que se actualiza el esquema en Supabase. Si configuras una nueva base de datos o te unes al proyecto, ejecuta estos scripts en el **SQL Editor** de tu panel de Supabase:
+
+### 1. Reseteo de Contraseña Obligatorio (Issue #15)
+Se añade una columna a los empleados para forzarles a cambiar la clave tras un restablecimiento por parte del administrador:
+```sql
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS requires_password_change BOOLEAN DEFAULT FALSE;
+```
