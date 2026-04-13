@@ -27,7 +27,7 @@ LocaleConfig.locales['es'] = {
 LocaleConfig.defaultLocale = 'es';
 import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations, requestVacation, cancelVacation, reactiveVacation, deleteVacation } from '../database/vacationService';
 import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee, resetEmployeePassword } from '../database/employeeService';
-import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts } from '../database/shiftService';
+import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts, updateShift } from '../database/shiftService';
 import { VacationCard } from '../components/VacationCard';
 import { ShiftBadge } from '../components/ShiftBadge';
 import { colors } from '../theme/colors';
@@ -64,6 +64,12 @@ export default function AdminScreen() {
   const [activeBrush, setActiveBrush] = useState('morning');
   const [copyModalVisible, setCopyModalVisible] = useState(false);
   const [copySummary, setCopySummary] = useState({ shifts: [], conflicts: [], sourceRange: '', targetRange: '' });
+  
+  // Specific shift editing
+  const [editShiftModalVisible, setEditShiftModalVisible] = useState(false);
+  const [editingShift, setEditingShift] = useState(null);
+  const [editShiftStart, setEditShiftStart] = useState('');
+  const [editShiftEnd, setEditShiftEnd] = useState('');
 
   const getShiftColor = useCallback((type) => {
     switch (type) {
@@ -392,6 +398,31 @@ export default function AdminScreen() {
     ]);
   };
 
+  const openEditShift = (shift) => {
+    setEditingShift(shift);
+    setEditShiftStart(shift.start_time || '');
+    setEditShiftEnd(shift.end_time || '');
+    setEditShiftModalVisible(true);
+  };
+
+  const handleSaveShift = async () => {
+    if (!editingShift) return;
+    try {
+      setLoading(true);
+      await updateShift(editingShift.id, {
+        start_time: editShiftStart,
+        end_time: editShiftEnd
+      });
+      await loadDayShifts();
+      setEditShiftModalVisible(false);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'No se pudo actualizar el horario del turno.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePrepareCopy = async () => {
     setLoading(true);
     try {
@@ -708,11 +739,16 @@ export default function AdminScreen() {
               ) : (
                 dayShifts.map((s) => (
                   <View key={s.id} style={styles.shiftRow}>
-                    <ShiftBadge shiftType={s.shift_type} />
+                    <ShiftBadge shiftType={s.shift_type} startTime={s.start_time} endTime={s.end_time} />
                     <Text style={styles.shiftEmpName}>{s.employee_name}</Text>
-                    <TouchableOpacity onPress={() => handleDeleteShift(s)} style={styles.deleteBtn}>
-                      <MaterialCommunityIcons name="delete-outline" size={18} color={colors.rejected} />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <TouchableOpacity onPress={() => openEditShift(s)} style={styles.deleteBtn}>
+                        <MaterialCommunityIcons name="pencil" size={18} color={colors.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteShift(s)} style={styles.deleteBtn}>
+                        <MaterialCommunityIcons name="delete-outline" size={18} color={colors.rejected} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ))
               )}
@@ -1091,6 +1127,44 @@ export default function AdminScreen() {
                 disabled={copySummary.shifts.length === 0}
               >
                 <Text style={styles.modalConfirmText}>Confirmar Copia</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Shift Time Modal */}
+      <Modal visible={editShiftModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Editar Horas exactas</Text>
+            <Text style={styles.modalSubtitle}>{editingShift?.employee_name} ({editingShift && format(parseISO(editingShift.date), 'dd/MM/yyyy')})</Text>
+
+            <Text style={styles.modalLabel}>Hora de Entrada (HH:mm)</Text>
+            <TextInput
+              style={styles.formInput}
+              placeholder="08:00"
+              value={editShiftStart}
+              onChangeText={setEditShiftStart}
+              keyboardType="numbers-and-punctuation"
+            />
+
+            <Text style={styles.modalLabel}>Hora de Salida (HH:mm)</Text>
+            <TextInput
+              style={styles.formInput}
+              placeholder="16:00"
+              value={editShiftEnd}
+              onChangeText={setEditShiftEnd}
+              keyboardType="numbers-and-punctuation"
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setEditShiftModalVisible(false)}>
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSaveShift}>
+                <Text style={styles.modalConfirmText}>Guardar</Text>
               </TouchableOpacity>
             </View>
           </View>
