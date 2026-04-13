@@ -1130,7 +1130,6 @@ export default function AdminScreen() {
               </TouchableOpacity>
             </View>
           </View>
-          </View>
         </View>
       </Modal>
 
