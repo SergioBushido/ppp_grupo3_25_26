@@ -27,7 +27,8 @@ LocaleConfig.locales['es'] = {
 LocaleConfig.defaultLocale = 'es';
 import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations, requestVacation, cancelVacation, reactiveVacation, deleteVacation } from '../database/vacationService';
 import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee, resetEmployeePassword } from '../database/employeeService';
-import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts, updateShift } from '../database/shiftService';
+import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts, updateShift, getShiftsByEmployee } from '../database/shiftService';
+import { getAllAttendancesByDate } from '../database/attendanceService';
 import { VacationCard } from '../components/VacationCard';
 import { ShiftBadge } from '../components/ShiftBadge';
 import { colors } from '../theme/colors';
@@ -37,6 +38,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const TABS = [
   { key: 'requests', label: 'Solicitudes', icon: 'inbox' },
   { key: 'shifts', label: 'Turnos', icon: 'calendar-edit' },
+  { key: 'attendances', label: 'Fichajes', icon: 'clock-check-outline' },
   { key: 'employees', label: 'Empleados', icon: 'account-group' },
   { key: 'reports', label: 'Reportes', icon: 'chart-bar' },
 ];
@@ -60,7 +62,12 @@ export default function AdminScreen() {
   const [shiftModalVisible, setShiftModalVisible] = useState(false);
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [dailyAssignments, setDailyAssignments] = useState({});
+  const [modifiedAssignmentDates, setModifiedAssignmentDates] = useState(new Set());
   const [assignEndDate, setAssignEndDate] = useState(new Date());
+
+  // Attendances monitoring
+  const [attendanceDate, setAttendanceDate] = useState(new Date());
+  const [dayAttendances, setDayAttendances] = useState([]);
   const [activeBrush, setActiveBrush] = useState('morning');
   const [copyModalVisible, setCopyModalVisible] = useState(false);
   const [copySummary, setCopySummary] = useState({ shifts: [], conflicts: [], sourceRange: '', targetRange: '' });
@@ -149,6 +156,18 @@ export default function AdminScreen() {
     const s = await getShiftsByDate(dateStr);
     setDayShifts(s);
   }, [selectedDate]);
+
+  const loadDayAttendances = useCallback(async () => {
+    const dateStr = format(attendanceDate, 'yyyy-MM-dd');
+    const records = await getAllAttendancesByDate(dateStr);
+    setDayAttendances(records);
+  }, [attendanceDate]);
+
+  useEffect(() => {
+    if (activeTab === 'attendances') {
+      loadDayAttendances();
+    }
+  }, [activeTab, loadDayAttendances]);
 
   const loadReportData = useCallback(async () => {
     setLoading(true);
@@ -300,7 +319,7 @@ export default function AdminScreen() {
     setLoading(true);
 
     try {
-      const days = getDaysInRange(selectedDate, assignEndDate);
+      const datesToProcess = Array.from(modifiedAssignmentDates);
       const shiftsToCreate = [];
       const datesToClear = [];
       const vacationDays = [];
@@ -308,8 +327,8 @@ export default function AdminScreen() {
 
       const empVacations = allVacations.filter(v => v.employee_id === selectedEmp.id && v.status === 'approved');
 
-      for (const date of days) {
-        const dStr = format(date, 'yyyy-MM-dd');
+      for (const dStr of datesToProcess) {
+        const date = parseISO(dStr);
 
         const hasConflict = empVacations.some(v =>
           isWithinInterval(date, { start: parseISO(v.start_date), end: parseISO(v.end_date) })
@@ -371,6 +390,7 @@ export default function AdminScreen() {
       setShiftModalVisible(false);
       setSelectedEmp(null);
       setDailyAssignments({});
+      setModifiedAssignmentDates(new Set());
 
       Alert.alert(
         '✅ Éxito',
@@ -500,6 +520,27 @@ export default function AdminScreen() {
     }
   };
 
+
+  const handleSelectEmployeeForAssignment = async (emp) => {
+    setSelectedEmp(emp);
+    setModifiedAssignmentDates(new Set());
+    if (!emp) {
+      setDailyAssignments({});
+      return;
+    }
+    
+    // Load pre-existing shifts visually
+    try {
+      const empShifts = await getShiftsByEmployee(emp.id);
+      const assignments = {};
+      empShifts.forEach(s => {
+        assignments[s.date] = s.shift_type;
+      });
+      setDailyAssignments(assignments);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const handleEditEmployee = (emp) => {
     setEditingEmployee(emp);
@@ -763,6 +804,53 @@ export default function AdminScreen() {
             </ScrollView>
           )}
 
+          {/* Attendances Tab */}
+          {activeTab === 'attendances' && (
+            <ScrollView contentContainerStyle={styles.listContent}>
+              {/* Date navigation */}
+              <View style={styles.dateNav}>
+                <TouchableOpacity
+                  style={styles.dateNavBtn}
+                  onPress={() => setAttendanceDate(addDays(attendanceDate, -1))}
+                >
+                  <MaterialCommunityIcons name="chevron-left" size={22} color={colors.primary} />
+                </TouchableOpacity>
+                <Text style={styles.dateNavText}>
+                  {format(attendanceDate, "EEEE, d 'de' MMMM", { locale: es }).replace(/^\w/, c => c.toUpperCase())}
+                </Text>
+                <TouchableOpacity
+                  style={styles.dateNavBtn}
+                  onPress={() => setAttendanceDate(addDays(attendanceDate, 1))}
+                >
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+
+              {dayAttendances.length === 0 ? (
+                <View style={styles.empty}>
+                  <MaterialCommunityIcons name="card-bulleted-off-outline" size={40} color={colors.textMuted} />
+                  <Text style={styles.emptyText}>Sin registros este día</Text>
+                </View>
+              ) : (
+                dayAttendances.map((r) => (
+                  <View key={r.id} style={styles.shiftRow}>
+                    <View style={[styles.badge, { backgroundColor: r.type === 'in' ? colors.action : colors.warning, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, marginRight: 12 }]}>
+                      <Text style={{ color: colors.white, fontWeight: 'bold', fontSize: 12 }}>
+                        {r.type === 'in' ? 'ENTRADA' : 'SALIDA'}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.shiftEmpName}>{r.employee_name || 'Desconocido'}</Text>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                        <MaterialCommunityIcons name="clock-outline" size={12} /> {format(parseISO(r.timestamp), 'HH:mm:ss')}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          )}
+
           {/* Employees Tab */}
           {activeTab === 'employees' && (
             <View style={{ flex: 1 }}>
@@ -877,7 +965,7 @@ export default function AdminScreen() {
                 <TouchableOpacity
                   key={emp.id}
                   style={[styles.empOption, selectedEmp?.id === emp.id && styles.empOptionSelected]}
-                  onPress={() => setSelectedEmp(emp)}
+                  onPress={() => handleSelectEmployeeForAssignment(emp)}
                 >
                   <Text style={[styles.empOptionText, selectedEmp?.id === emp.id && styles.empOptionTextSelected]}>
                     {emp.name}
@@ -909,6 +997,11 @@ export default function AdminScreen() {
               markingType={'custom'}
               markedDates={markedDatesForCalendar}
               onDayPress={(day) => {
+                setModifiedAssignmentDates(prev => {
+                  const next = new Set(prev);
+                  next.add(day.dateString);
+                  return next;
+                });
                 setDailyAssignments(prev => ({
                   ...prev,
                   [day.dateString]: activeBrush
@@ -928,7 +1021,7 @@ export default function AdminScreen() {
             <View style={[styles.modalActions, { marginTop: 16 }]}>
               <TouchableOpacity
                 style={styles.modalCancelBtn}
-                onPress={() => { setShiftModalVisible(false); setSelectedEmp(null); setDailyAssignments({}); }}
+                onPress={() => { setShiftModalVisible(false); setSelectedEmp(null); setDailyAssignments({}); setModifiedAssignmentDates(new Set()); }}
               >
                 <Text style={styles.modalCancelText}>Cancelar</Text>
               </TouchableOpacity>
