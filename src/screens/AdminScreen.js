@@ -26,7 +26,7 @@ LocaleConfig.locales['es'] = {
 };
 LocaleConfig.defaultLocale = 'es';
 import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations, requestVacation, cancelVacation, reactiveVacation, deleteVacation } from '../database/vacationService';
-import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee } from '../database/employeeService';
+import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee, resetEmployeePassword } from '../database/employeeService';
 import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts } from '../database/shiftService';
 import { VacationCard } from '../components/VacationCard';
 import { ShiftBadge } from '../components/ShiftBadge';
@@ -521,6 +521,41 @@ export default function AdminScreen() {
     );
   };
 
+  const handleResetPassword = () => {
+    Alert.alert(
+      'Restablecer Contraseña',
+      `¿Generar una nueva contraseña temporal para ${editingEmployee.name}? Se le pedirá que la cambie en su próximo inicio de sesión.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Restablecer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Generate a 6-character random password
+              const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+              let tempPass = '';
+              for (let i = 0; i < 6; i++) {
+                tempPass += chars.charAt(Math.floor(Math.random() * chars.length));
+              }
+
+              await resetEmployeePassword(editingEmployee.id, tempPass);
+              
+              Alert.alert(
+                'Contraseña Restablecida',
+                `La nueva contraseña temporal para ${editingEmployee.name} es:\n\n${tempPass}\n\nPor favor, cópiala y entrégasela al empleado.`,
+                [{ text: 'Entendido' }]
+              );
+              setEditModalVisible(false);
+            } catch (e) {
+              Alert.alert('Error', 'No se pudo restablecer la contraseña.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleCreateEmployee = async () => {
     if (!newName || !newEmail || !newPass) {
       Alert.alert('Error', 'Por favor, rellena todos los campos.');
@@ -904,6 +939,14 @@ export default function AdminScreen() {
               keyboardType="numeric"
               maxLength={3}
             />
+
+            <TouchableOpacity
+              style={[styles.deleteLink, { marginTop: 16 }]}
+              onPress={handleResetPassword}
+            >
+              <MaterialCommunityIcons name="lock-reset" size={16} color={colors.primary} />
+              <Text style={[styles.deleteLinkText, { color: colors.primary }]}>Restablecer contraseña</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.deleteLink}
