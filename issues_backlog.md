@@ -8,9 +8,8 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 - [ ] **Issue #16 - Gestión de Vacaciones Aprobadas (Control Admin):** 
   - *Descripción:* Botón para cancelar vacaciones aprobadas y devolver días automáticamente.
   - *Prioridad:* Alta.
-- [ ] **Issue #20 - Rediseño Premium del Monitor de Fichajes:** 
-  - *Descripción:* Transformar la lista de fichajes en un panel con tarjetas, timeline visual, avatares y estados activos ("En el centro").
-  - *Prioridad:* Media.
+
+
 
 
 
@@ -30,6 +29,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ---
 
 ## ✅ Tareas Completadas
+- [x] **Issue #20 - Rediseño Premium del Monitor de Fichajes:** Implementada interfaz tipo Timeline con tarjetas, avatares dinámicos e indicadores de estado activo para el administrador.
 - [x] **Issue #17 - Monitor de Fichajes (Panel Admin):** Pestaña nueva con auditoría diaria del horario exacto de entrada y salida de los empleados.
 - [x] **Issue #12 - Plantillas Horarias:** Añadidos campos `start_time` y `end_time` a turnos. Edición manual y vista explícita.
 - [x] **Issue #13 - Registro de Jornada (Fichaje):** Botón de Entrada/Salida vinculado a Supabase.
