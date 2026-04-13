@@ -116,7 +116,7 @@ function MainTabs() {
         name="Admin"
         component={AdminScreen}
         options={{
-          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
         }}
       />
     </Tab.Navigator>
