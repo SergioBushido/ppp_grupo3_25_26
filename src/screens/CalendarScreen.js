@@ -363,7 +363,7 @@ export default function CalendarScreen({ navigation }) {
                 selectedDayShifts.map((s, i) => (
                   <View key={i} style={styles.dayDetailRow}>
                     <View style={styles.dayDetailInfo}>
-                      <ShiftBadge shiftType={s.shift_type} />
+                      <ShiftBadge shiftType={s.shift_type} startTime={s.start_time} endTime={s.end_time} />
                       {user.role === 'admin' && s.employee_name && (
                         <Text style={styles.empName}>{s.employee_name}</Text>
                       )}

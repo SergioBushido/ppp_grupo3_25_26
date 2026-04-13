@@ -35,9 +35,12 @@ const SHIFT_CONFIG = {
   },
 };
 
-export function ShiftBadge({ shiftType, size = 'md', style }) {
+export function ShiftBadge({ shiftType, size = 'md', style, startTime, endTime }) {
   const config = SHIFT_CONFIG[shiftType] || SHIFT_CONFIG.morning;
   const isSmall = size === 'sm';
+
+  const formatTime = (time) => time ? time.substring(0, 5) : null;
+  const timeText = startTime && endTime ? ` (${formatTime(startTime)} - ${formatTime(endTime)})` : '';
 
   return (
     <View
@@ -54,7 +57,7 @@ export function ShiftBadge({ shiftType, size = 'md', style }) {
         color={config.text}
       />
       <Text style={[styles.label, { color: config.text }, isSmall && styles.labelSmall]}>
-        {config.label}
+        {config.label}{timeText}
       </Text>
     </View>
   );
