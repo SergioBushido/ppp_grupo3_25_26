@@ -32,7 +32,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ---
 
 ## ✅ Tareas Completadas
-- [x] **Issue #17 - Reseteo de Contraseñas (Admin):** Panel de reseteo temporal y flujo cautivo de cambio obligatorio.
+- [x] **Issue #15 - Reseteo de Contraseñas (Admin):** Panel de reseteo temporal y flujo cautivo de cambio obligatorio. (Anteriormente citada como #17).
 - [x] **Issue #19 - Pantalla de Ajustes de Usuario (Settings):** Creada pantalla independiente con gestión de perfil, cambio de contraseña y cierre de sesión. Limpieza del `HomeScreen`.
 - [x] **Issue #9 - Rediseño del Dashboard:** Pantalla de inicio minimalista con botones degradados (`expo-linear-gradient`).
 - [x] **Issue #10 - Navegación Premium:** Iconos con estados personalizados, indicadores de pestaña activa y botón de Vacaciones destacado en rojo.
@@ -43,5 +43,5 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Incidencia:* Error `The action 'NAVIGATE' with payload {"name":"Admin"} was not handled by any navigator` al pulsar el botón desde Home, seguido de un problema donde los datos de administración no se cargaban.
   - *Solución:* Se reintegró `AdminScreen` al `MainTabs` con el botón oculto (`tabBarButton: () => null`) para preservar la visibilidad del menú inferior. Se añadió `useFocusEffect` en `AdminScreen` para forzar la recarga de datos de la base de datos al mostrar la pestaña, en lugar de usar un `useEffect` que solo cargaba una vez en segundo plano.
 - [x] **Issue #8:** Asignación masiva de turnos mediante calendario interactivo.
-- [x] **Issue #15:** Selector táctil de vacaciones para empleados.
+- [x] **Issue #20:** Selector táctil de vacaciones para empleados. (Reenumerado para evitar colisión con Issue #15).
 - [x] **Migración a Supabase:** Sincronización en tiempo real finalizada.
