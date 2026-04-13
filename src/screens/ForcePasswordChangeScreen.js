@@ -8,7 +8,7 @@ import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 
 export default function ForcePasswordChangeScreen() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
   const [currentPass, setCurrentPass] = useState('');
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
@@ -100,6 +100,14 @@ export default function ForcePasswordChangeScreen() {
               <Text style={styles.submitBtnText}>Actualizar Contraseña</Text>
             )}
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={logout}
+            disabled={loading}
+          >
+            <Text style={styles.cancelBtnText}>Cancelar y Salir</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
@@ -174,5 +182,15 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.bold,
+  },
+  cancelBtn: {
+    marginTop: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.medium,
   },
 });
