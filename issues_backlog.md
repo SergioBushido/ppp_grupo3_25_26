@@ -5,18 +5,13 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ## 🚀 Próximas Tareas (Pendientes)
 
 ### Funcionalidades Core
-- [ ] **Issue #13 - Registro de Jornada (Fichaje):** 
-  - *Descripción:* Botón de 'Entrada/Salida' que registre eventos en Supabase.
-  - *Prioridad:* Alta.
 - [ ] **Issue #16 - Gestión de Vacaciones Aprobadas (Control Admin):** 
   - *Descripción:* Botón para cancelar vacaciones aprobadas y devolver días automáticamente.
   - *Prioridad:* Alta.
 
 
+
 ### Reportes e Ingeniería
-- [ ] **Issue #12 - Plantillas Horarias:** 
-  - *Descripción:* Añadir campos `start_time` y `end_time` a los turnos.
-  - *Prioridad:* Baja.
 - [ ] **Issue #14 - Exportación a PDF:** 
   - *Descripción:* Generar cuadrícula mensual en PDF.
   - *Prioridad:* Baja.
@@ -32,6 +27,9 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ---
 
 ## ✅ Tareas Completadas
+- [x] **Issue #17 - Monitor de Fichajes (Panel Admin):** Pestaña nueva con auditoría diaria del horario exacto de entrada y salida de los empleados.
+- [x] **Issue #12 - Plantillas Horarias:** Añadidos campos `start_time` y `end_time` a turnos. Edición manual y vista explícita.
+- [x] **Issue #13 - Registro de Jornada (Fichaje):** Botón de Entrada/Salida vinculado a Supabase.
 - [x] **Issue #15 - Reseteo de Contraseñas (Admin):** Panel de reseteo temporal y flujo cautivo de cambio obligatorio. (Anteriormente citada como #17).
 - [x] **Issue #19 - Pantalla de Ajustes de Usuario (Settings):** Creada pantalla independiente con gestión de perfil, cambio de contraseña y cierre de sesión. Limpieza del `HomeScreen`.
 - [x] **Issue #9 - Rediseño del Dashboard:** Pantalla de inicio minimalista con botones degradados (`expo-linear-gradient`).
@@ -42,6 +40,9 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 - [x] **BugFix - Navegación y Carga del Panel Admin:** 
   - *Incidencia:* Error `The action 'NAVIGATE' with payload {"name":"Admin"} was not handled by any navigator` al pulsar el botón desde Home, seguido de un problema donde los datos de administración no se cargaban.
   - *Solución:* Se reintegró `AdminScreen` al `MainTabs` con el botón oculto (`tabBarButton: () => null`) para preservar la visibilidad del menú inferior. Se añadió `useFocusEffect` en `AdminScreen` para forzar la recarga de datos de la base de datos al mostrar la pestaña, en lugar de usar un `useEffect` que solo cargaba una vez en segundo plano.
+- [x] **BugFix - Calendario de Asignaciones (Issue #8 / #17):**
+  - *Incidencia:* El modal de asignación de turnos ("pincel") sólo guardaba el 'Día Seleccionado' en lugar de todas las fechas pintadas. Además, no mostraba visualmente los turnos que el empleado ya tenía configurados en la base de datos.
+  - *Solución:* Se integró `getShiftsByEmployee` en el componente modal para precargar todo el historial del trabajador seleccionado como `dailyAssignments`. Se refactorizó la lógica en `handleAddShift` para grabar todos los cambios localizados en el `Set` `modifiedAssignmentDates`, resolviendo las inserciones desfasadas.
 - [x] **Issue #8:** Asignación masiva de turnos mediante calendario interactivo.
 - [x] **Issue #20:** Selector táctil de vacaciones para empleados. (Reenumerado para evitar colisión con Issue #15).
 - [x] **Migración a Supabase:** Sincronización en tiempo real finalizada.
