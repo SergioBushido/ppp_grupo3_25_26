@@ -112,6 +112,13 @@ function MainTabs() {
           ),
         }}
       />
+      <Tab.Screen
+        name="Admin"
+        component={AdminScreen}
+        options={{
+          tabBarButton: () => null,
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -128,11 +135,6 @@ export default function AppNavigator() {
       ) : (
         <>
           <Stack.Screen name="Main" component={MainTabs} />
-          <Stack.Screen
-            name="Admin"
-            component={AdminScreen}
-            options={{ headerShown: false }}
-          />
           <Stack.Screen
             name="RequestVacation"
             component={RequestVacationScreen}
