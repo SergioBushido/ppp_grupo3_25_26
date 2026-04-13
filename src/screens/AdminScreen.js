@@ -47,7 +47,24 @@ const SHIFT_OPTIONS = [
   { type: 'morning', label: 'Mañana', icon: 'weather-sunny' },
   { type: 'afternoon', label: 'Tarde', icon: 'weather-sunset' },
   { type: 'night', label: 'Noche', icon: 'weather-night' },
+const AVATAR_COLORS = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+  '#F06292', '#AED581', '#FFD54F', '#4DB6AC', '#7986CB'
 ];
+
+const getInitials = (name) => {
+  if (!name) return '??';
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+};
+
+const getAvatarColor = (name) => {
+  if (!name) return AVATAR_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+};
 
 export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState('requests');
@@ -166,7 +183,19 @@ export default function AdminScreen() {
   const loadDayAttendances = useCallback(async () => {
     const dateStr = format(attendanceDate, 'yyyy-MM-dd');
     const records = await getAllAttendancesByDate(dateStr);
-    setDayAttendances(records);
+    
+    // Identify active employees (who have an 'in' but no 'out' yet)
+    const empStatus = {};
+    records.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(r => {
+      empStatus[r.employee_id] = r.type;
+    });
+    
+    const enrichedRecords = records.map(r => ({
+      ...r,
+      isActive: empStatus[r.employee_id] === 'in' && format(new Date(), 'yyyy-MM-dd') === dateStr
+    }));
+
+    setDayAttendances(enrichedRecords);
   }, [attendanceDate]);
 
   useEffect(() => {
@@ -812,9 +841,9 @@ export default function AdminScreen() {
 
           {/* Attendances Tab */}
           {activeTab === 'attendances' && (
-            <ScrollView contentContainerStyle={styles.listContent}>
+            <ScrollView contentContainerStyle={[styles.listContent, { paddingTop: 10 }]}>
               {/* Date navigation */}
-              <View style={styles.dateNav}>
+              <View style={[styles.dateNav, { marginBottom: 20 }]}>
                 <TouchableOpacity
                   style={styles.dateNavBtn}
                   onPress={() => setAttendanceDate(addDays(attendanceDate, -1))}
@@ -834,25 +863,59 @@ export default function AdminScreen() {
 
               {dayAttendances.length === 0 ? (
                 <View style={styles.empty}>
-                  <MaterialCommunityIcons name="card-bulleted-off-outline" size={40} color={colors.textMuted} />
-                  <Text style={styles.emptyText}>Sin registros este día</Text>
+                  <MaterialCommunityIcons name="clock-alert-outline" size={60} color={colors.textMuted} />
+                  <Text style={styles.emptyText}>Sin actividad registrada hoy</Text>
                 </View>
               ) : (
-                dayAttendances.map((r) => (
-                  <View key={r.id} style={styles.shiftRow}>
-                    <View style={[styles.badge, { backgroundColor: r.type === 'in' ? colors.action : colors.warning, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, marginRight: 12 }]}>
-                      <Text style={{ color: colors.white, fontWeight: 'bold', fontSize: 12 }}>
-                        {r.type === 'in' ? 'ENTRADA' : 'SALIDA'}
-                      </Text>
+                <View style={styles.attendanceContainer}>
+                  <View style={styles.timelineLine} />
+                  {dayAttendances.map((r, index) => (
+                    <View key={r.id} style={styles.attendanceCard}>
+                      <View style={[styles.attendanceAvatar, { backgroundColor: getAvatarColor(r.employee_name) }]}>
+                        <Text style={styles.attendanceAvatarText}>{getInitials(r.employee_name)}</Text>
+                        {r.isActive && <View style={styles.activePulse} />}
+                      </View>
+                      
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={[styles.shiftEmpName, { marginBottom: 2 }]}>{r.employee_name || 'Desconocido'}</Text>
+                          <View style={[styles.attendanceBadge, { backgroundColor: r.type === 'in' ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 152, 0, 0.1)' }]}>
+                            <Text style={{ 
+                              color: r.type === 'in' ? '#2E7D32' : '#E65100', 
+                              fontWeight: 'bold', 
+                              fontSize: 10,
+                              textTransform: 'uppercase'
+                            }}>
+                              {r.type === 'in' ? 'Entrada' : 'Salida'}
+                            </Text>
+                          </View>
+                        </View>
+                        
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <MaterialCommunityIcons name="clock-outline" size={14} color={colors.textMuted} />
+                            <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '500' }}>
+                              {format(parseISO(r.timestamp), 'HH:mm:ss')}
+                            </Text>
+                          </View>
+                          {r.isActive && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#4CAF50' }} />
+                              <Text style={{ fontSize: 11, color: '#4CAF50', fontWeight: 'bold' }}>EN EL CENTRO</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                      
+                      <MaterialCommunityIcons 
+                        name={r.type === 'in' ? "login-variant" : "logout-variant"} 
+                        size={20} 
+                        color={r.type === 'in' ? colors.action : colors.warning} 
+                        style={{ marginLeft: 10, opacity: 0.6 }}
+                      />
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.shiftEmpName}>{r.employee_name || 'Desconocido'}</Text>
-                      <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                        <MaterialCommunityIcons name="clock-outline" size={12} /> {format(parseISO(r.timestamp), 'HH:mm:ss')}
-                      </Text>
-                    </View>
-                  </View>
-                ))
+                  ))}
+                </View>
               )}
             </ScrollView>
           )}
@@ -1701,6 +1764,65 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.bold,
     color: colors.textPrimary,
+  },
+  attendanceContainer: {
+    paddingLeft: 20,
+    marginTop: 10,
+  },
+  timelineLine: {
+    position: 'absolute',
+    left: 42,
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: colors.border,
+    zIndex: -1,
+  },
+  attendanceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.02)',
+  },
+  attendanceAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  attendanceAvatarText: {
+    color: colors.white,
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  attendanceBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 4,
+    alignSelf: 'flex-start',
+  },
+  activePulse: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#4CAF50',
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    borderWidth: 2,
+    borderColor: colors.white,
   },
   conflictRow: {
     flexDirection: 'row',
