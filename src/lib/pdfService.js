@@ -13,8 +13,33 @@ import * as Sharing from 'expo-sharing';
  */
 
 export async function generarReportePDF(empleados, opciones) {
-  // Plantilla estática de cuadrícula mensual y resumen
-  // TODO: Reemplazar datos estáticos por dinámicos
+  // opciones: { mes, año, nombreEmpresa }
+  const { mes, año, nombreEmpresa = 'TransferLog' } = opciones;
+  const diasMes = new Date(año, mes, 0).getDate(); // mes: 1-12
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  // Genera cabecera de días
+  const thDias = Array.from({length: diasMes}, (_, i) => `<th>Día ${i+1}</th>`).join('');
+
+  // Genera filas de empleados
+  const filas = empleados.map(emp => {
+    let totales = { M: 0, T: 0, N: 0, V: 0 };
+    // Para cada día del mes
+    const tds = Array.from({length: diasMes}, (_, d) => {
+      const turno = emp.turnos?.find(t => Number(t.dia) === d+1);
+      if (turno) {
+        if (turno.tipo === 'M') { totales.M++; return '<td class="manana">M</td>'; }
+        if (turno.tipo === 'T') { totales.T++; return '<td class="tarde">T</td>'; }
+        if (turno.tipo === 'N') { totales.N++; return '<td class="noche">N</td>'; }
+      }
+      // Vacaciones
+      const vac = emp.vacaciones?.find(v => Number(v.dia) === d+1);
+      if (vac) { totales.V++; return '<td class="vacaciones">V</td>'; }
+      return '<td></td>';
+    }).join('');
+    return `<tr><td>${emp.nombre}</td>${tds}<td class="resumen">${totales.M}</td><td class="resumen">${totales.T}</td><td class="resumen">${totales.N}</td><td class="resumen">${totales.V}</td></tr>`;
+  }).join('\n');
+
   const html = `
     <html>
     <head>
@@ -38,24 +63,14 @@ export async function generarReportePDF(empleados, opciones) {
     </head>
     <body>
       <h1>Reporte Mensual de Turnos</h1>
-      <div class="subtitle">Mes: Marzo 2026 &mdash; Empresa: TransferLog</div>
+      <div class="subtitle">Mes: ${meses[mes-1]} ${año} &mdash; Empresa: ${nombreEmpresa}</div>
       <table>
         <tr>
           <th>Empleado</th>
-          <th>Día 1</th><th>Día 2</th><th>Día 3</th><th>Día 4</th><th>Día 5</th><th>Día 6</th><th>Día 7</th><th>Día 8</th><th>Día 9</th><th>Día 10</th>
-          <th>Día 11</th><th>Día 12</th><th>Día 13</th><th>Día 14</th><th>Día 15</th><th>Día 16</th><th>Día 17</th><th>Día 18</th><th>Día 19</th><th>Día 20</th>
-          <th>Día 21</th><th>Día 22</th><th>Día 23</th><th>Día 24</th><th>Día 25</th><th>Día 26</th><th>Día 27</th><th>Día 28</th><th>Día 29</th><th>Día 30</th><th>Día 31</th>
+          ${thDias}
           <th>M</th><th>T</th><th>N</th><th>V</th>
         </tr>
-        <!-- Ejemplo de fila de empleado -->
-        <tr>
-          <td>Juan Pérez</td>
-          <td class="manana">M</td><td class="tarde">T</td><td class="noche">N</td><td class="vacaciones">V</td><td></td><td></td><td></td><td></td><td></td><td></td>
-          <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-          <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-          <td class="resumen">10</td><td class="resumen">8</td><td class="resumen">7</td><td class="resumen">2</td>
-        </tr>
-        <!-- Más empleados... -->
+        ${filas}
       </table>
       <div class="firma-block">
         <div class="firma">
