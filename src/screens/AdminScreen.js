@@ -1,3 +1,81 @@
+import { generarReportePDF } from '../lib/pdfService';
+  // Estado para exportación PDF
+  const [exportandoPDF, setExportandoPDF] = useState(false);
+  // Construye la matriz mensual para el PDF
+  const construirMatrizPDF = () => {
+    const year = reportMonth.getFullYear();
+    const month = reportMonth.getMonth() + 1;
+    const diasMes = new Date(year, month, 0).getDate();
+    // Estructura: [{ nombre, turnos: [{dia, tipo}], vacaciones: [{dia}] }]
+    return employees.map(emp => {
+      // Turnos por día
+      const turnos = [];
+      const empShifts = reportData.find(e => e.id === emp.id)?.shifts || [];
+      for (let d = 1; d <= diasMes; d++) {
+        const turno = empShifts.find(t => Number(t.dia) === d);
+        if (turno) {
+          let tipo = '';
+          if (turno.shift_type === 'morning') tipo = 'M';
+          else if (turno.shift_type === 'afternoon') tipo = 'T';
+          else if (turno.shift_type === 'night') tipo = 'N';
+          turnos.push({ dia: d, tipo });
+        }
+      }
+      // Vacaciones por día
+      const vacaciones = [];
+      const empVac = reportData.find(e => e.id === emp.id)?.vacacionesDias || [];
+      for (let d = 1; d <= diasMes; d++) {
+        if (empVac.includes(d)) vacaciones.push({ dia: d });
+      }
+      return { nombre: emp.name, turnos, vacaciones };
+    });
+  };
+  // Exportar PDF detallado
+  const handleExportarPDF = async () => {
+    setExportandoPDF(true);
+    try {
+      // Construir datos para el PDF
+      // Si reportData no tiene los turnos por día, hay que obtenerlos
+      const year = reportMonth.getFullYear();
+      const month = reportMonth.getMonth() + 1;
+      // Obtener todos los turnos y vacaciones del mes
+      const shiftsData = await getShiftsForMonth(year, month);
+      const allVacationsData = await getAllVacations();
+      const empleados = employees.map(emp => {
+        // Turnos por día
+        const turnos = [];
+        for (let d = 1; d <= new Date(year, month, 0).getDate(); d++) {
+          const fecha = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const turno = shiftsData.find(s => s.employee_id === emp.id && s.date === fecha);
+          if (turno) {
+            let tipo = '';
+            if (turno.shift_type === 'morning') tipo = 'M';
+            else if (turno.shift_type === 'afternoon') tipo = 'T';
+            else if (turno.shift_type === 'night') tipo = 'N';
+            turnos.push({ dia: d, tipo });
+          }
+        }
+        // Vacaciones por día
+        const vacaciones = [];
+        allVacationsData.filter(v => v.employee_id === emp.id && v.status === 'approved').forEach(v => {
+          const start = new Date(v.start_date);
+          const end = new Date(v.end_date);
+          for (let d = 1; d <= new Date(year, month, 0).getDate(); d++) {
+            const fecha = new Date(year, month - 1, d);
+            if (fecha >= start && fecha <= end) {
+              vacaciones.push({ dia: d });
+            }
+          }
+        });
+        return { nombre: emp.name, turnos, vacaciones };
+      });
+      await generarReportePDF(empleados, { mes: month, año: year, nombreEmpresa: 'TransferLog' });
+    } catch (e) {
+      Alert.alert('Error', e.message || 'No se pudo generar el PDF');
+    } finally {
+      setExportandoPDF(false);
+    }
+  };
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -773,7 +851,7 @@ export default function AdminScreen() {
         ))}
       </View>
 
-      {loading ? (
+      {loading || exportandoPDF ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
       ) : (
         <>
@@ -876,35 +954,52 @@ export default function AdminScreen() {
           )}
 
           {/* Attendances Tab */}
-          {activeTab === 'attendances' && (
-            <ScrollView contentContainerStyle={[styles.listContent, { paddingTop: 10 }]}>
-              {/* Date navigation */}
-              <View style={[styles.dateNav, { marginBottom: 20 }]}>
-                <TouchableOpacity
-                  style={styles.dateNavBtn}
-                  onPress={() => setAttendanceDate(addDays(attendanceDate, -1))}
-                >
-                  <MaterialCommunityIcons name="chevron-left" size={22} color={colors.primary} />
-                </TouchableOpacity>
-                <Text style={styles.dateNavText}>
-                  {format(attendanceDate, "EEEE, d 'de' MMMM", { locale: es }).replace(/^\w/, c => c.toUpperCase())}
+          {activeTab === 'reports' && (
+            <ScrollView style={styles.tabContent}>
+              <Text style={styles.sectionTitle}>Resumen mensual</Text>
+              {/* Botón de exportación PDF */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.primary,
+                  padding: 12,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  marginVertical: 12
+                }}
+                onPress={handleExportarPDF}
+                disabled={exportandoPDF}
+              >
+                <MaterialCommunityIcons name="file-pdf-box" size={20} color={colors.white} />
+                <Text style={{ color: colors.white, fontWeight: 'bold', marginTop: 4 }}>
+                  Exportar PDF Detallado
                 </Text>
-                <TouchableOpacity
-                  style={styles.dateNavBtn}
-                  onPress={() => setAttendanceDate(addDays(attendanceDate, 1))}
-                >
-                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Search Bar */}
-              <View style={styles.searchContainer}>
-                <MaterialCommunityIcons name="magnify" size={20} color={colors.textMuted} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Buscar empleado..."
-                  value={attendanceFilter}
-                  onChangeText={setAttendanceFilter}
+              </TouchableOpacity>
+              {/* Aquí iría la tabla/resumen visual */}
+              <FlatList
+                data={reportData}
+                keyExtractor={(item) => String(item.id)}
+                renderItem={({ item }) => (
+                  <View style={styles.reportRow}>
+                    <Text style={styles.reportCell}>{item.name}</Text>
+                    <Text style={styles.reportCell}>{item.morning}</Text>
+                    <Text style={styles.reportCell}>{item.afternoon}</Text>
+                    <Text style={styles.reportCell}>{item.night}</Text>
+                    <Text style={styles.reportCell}>{item.vacations}</Text>
+                  </View>
+                )}
+                ListHeaderComponent={
+                  <View style={styles.reportHeader}>
+                    <Text style={styles.reportCell}>Empleado</Text>
+                    <Text style={styles.reportCell}>M</Text>
+                    <Text style={styles.reportCell}>T</Text>
+                    <Text style={styles.reportCell}>N</Text>
+                    <Text style={styles.reportCell}>V</Text>
+                  </View>
+                }
+                ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 24 }}>Sin datos</Text>}
+              />
+            </ScrollView>
+          )}
                   placeholderTextColor={colors.textMuted}
                 />
                 {attendanceFilter !== '' && (
