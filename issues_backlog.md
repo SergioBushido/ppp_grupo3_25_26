@@ -7,10 +7,30 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 - Todo completado.
 
 
+
 ### Reportes e Ingeniería
-- [ ] **Issue #14 - Exportación a PDF:** 
-  - *Descripción:* Generar cuadrícula mensual en PDF.
-  - *Prioridad:* Baja.
+- [x] **Issue #21 - Exportación mensual a PDF Detallado:**
+  - *Descripción:* Implementado sistema completo de generación y exportación de cuadrícula mensual en PDF profesional, con resumen por empleado, bloque de validación y compatibilidad móvil.
+  - *Hitos técnicos:*
+    - Instalación y configuración de expo-print y expo-sharing.
+    - Creación de servicio pdfService.js con motor HTML/CSS adaptable (28-31 días).
+    - Refactor en AdminScreen.js para construir matriz mensual desde Supabase.
+    - Integración de botón “Exportar PDF Detallado” en la pestaña de reportes.
+    - Indicador de carga y control de errores en la UI.
+    - Validación visual y funcional en dispositivos Android/iOS.
+  - *Pruebas realizadas:*
+    - Generación correcta en meses de 28, 30 y 31 días.
+    - Pruebas con pocos y muchos empleados.
+    - Validación de estructura, colores y resumen en PDF.
+    - Compartición nativa en Android/iOS (WhatsApp, Email, Archivos).
+  - *Criterios de aceptación:*
+    - El administrador puede generar el PDF de cualquier mes seleccionado.
+    - El PDF es apto para impresión y archivo oficial.
+    - La cuadrícula refleja turnos y vacaciones por empleado.
+    - El documento incluye resumen y bloque de firma/sello.
+    - El PDF se comparte correctamente desde el dispositivo.
+    - Los datos exportados coinciden con Supabase.
+  - *Estado:* Completado y documentado. Referencia commits en rama feature/pdf-export y Issue #21.
 - [ ] **Issue #11 - Suite de Pruebas:** 
   - *Descripción:* Configurar Jest y realizar tests de lógica de negocio.
   - *Prioridad:* Media.
