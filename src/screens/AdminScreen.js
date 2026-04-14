@@ -1,16 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
   Modal,
   TextInput,
   ScrollView,
+  Animated,
 } from 'react-native';
+import { useRef } from 'react';
+
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, addDays, startOfMonth, endOfMonth, subMonths, addMonths, parseISO, differenceInCalendarDays, startOfWeek, endOfWeek, subWeeks, addWeeks, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -97,6 +91,31 @@ export default function AdminScreen() {
   const [editShiftStart, setEditShiftStart] = useState('');
   const [editShiftEnd, setEditShiftEnd] = useState('');
 
+  // Attendance filter & animation
+  const [attendanceFilter, setAttendanceFilter] = useState('');
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (activeTab === 'attendances') {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [activeTab, pulseAnim]);
+
   const getShiftColor = useCallback((type) => {
     switch (type) {
       case 'morning': return colors.morning;
@@ -142,7 +161,14 @@ export default function AdminScreen() {
   const [reportMonth, setReportMonth] = useState(new Date());
   const [reportData, setReportData] = useState([]);
 
+  const filteredAttendances = React.useMemo(() => {
+    return dayAttendances.filter(r => 
+      r.employee_name?.toLowerCase().includes(attendanceFilter.toLowerCase())
+    );
+  }, [dayAttendances, attendanceFilter]);
+
   const { useFocusEffect } = require('@react-navigation/native');
+
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -844,38 +870,52 @@ export default function AdminScreen() {
           {/* Attendances Tab */}
           {activeTab === 'attendances' && (
             <ScrollView contentContainerStyle={[styles.listContent, { paddingTop: 10 }]}>
-              {/* Date navigation */}
-              <View style={[styles.dateNav, { marginBottom: 20 }]}>
-                <TouchableOpacity
-                  style={styles.dateNavBtn}
-                  onPress={() => setAttendanceDate(addDays(attendanceDate, -1))}
-                >
-                  <MaterialCommunityIcons name="chevron-left" size={22} color={colors.primary} />
-                </TouchableOpacity>
-                <Text style={styles.dateNavText}>
-                  {format(attendanceDate, "EEEE, d 'de' MMMM", { locale: es }).replace(/^\w/, c => c.toUpperCase())}
-                </Text>
-                <TouchableOpacity
-                  style={styles.dateNavBtn}
-                  onPress={() => setAttendanceDate(addDays(attendanceDate, 1))}
-                >
-                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
                 </TouchableOpacity>
               </View>
 
-              {dayAttendances.length === 0 ? (
+              {/* Search Bar */}
+              <View style={styles.searchContainer}>
+                <MaterialCommunityIcons name="magnify" size={20} color={colors.textMuted} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Buscar empleado..."
+                  value={attendanceFilter}
+                  onChangeText={setAttendanceFilter}
+                  placeholderTextColor={colors.textMuted}
+                />
+                {attendanceFilter !== '' && (
+                  <TouchableOpacity onPress={() => setAttendanceFilter('')}>
+                    <MaterialCommunityIcons name="close-circle" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {filteredAttendances.length === 0 ? (
                 <View style={styles.empty}>
-                  <MaterialCommunityIcons name="clock-alert-outline" size={60} color={colors.textMuted} />
-                  <Text style={styles.emptyText}>Sin actividad registrada hoy</Text>
+                  <MaterialCommunityIcons 
+                    name={attendanceFilter ? "account-search-outline" : "clock-alert-outline"} 
+                    size={60} 
+                    color={colors.textMuted} 
+                  />
+                  <Text style={styles.emptyText}>
+                    {attendanceFilter ? `No hay resultados para "${attendanceFilter}"` : "Sin actividad registrada hoy"}
+                  </Text>
                 </View>
               ) : (
                 <View style={styles.attendanceContainer}>
                   <View style={styles.timelineLine} />
-                  {dayAttendances.map((r, index) => (
+                  {filteredAttendances.map((r, index) => (
                     <View key={r.id} style={styles.attendanceCard}>
                       <View style={[styles.attendanceAvatar, { backgroundColor: getAvatarColor(r.employee_name) }]}>
                         <Text style={styles.attendanceAvatarText}>{getInitials(r.employee_name)}</Text>
-                        {r.isActive && <View style={styles.activePulse} />}
+                        {r.isActive && (
+                          <Animated.View 
+                            style={[
+                              styles.activePulse, 
+                              { transform: [{ scale: pulseAnim }], opacity: 0.8 }
+                            ]} 
+                          />
+                        )}
                       </View>
                       
                       <View style={{ flex: 1 }}>
@@ -1816,15 +1856,33 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   activePulse: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: '#4CAF50',
     position: 'absolute',
-    right: 0,
-    top: 0,
+    right: -2,
+    top: -2,
     borderWidth: 2,
     borderColor: colors.white,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.textPrimary,
+    marginLeft: 8,
+    padding: 0,
   },
   conflictRow: {
     flexDirection: 'row',
