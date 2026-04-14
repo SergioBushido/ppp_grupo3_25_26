@@ -1,9 +1,17 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
   Modal,
   TextInput,
   ScrollView,
   Animated,
 } from 'react-native';
-import { useRef } from 'react';
 
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, addDays, startOfMonth, endOfMonth, subMonths, addMonths, parseISO, differenceInCalendarDays, startOfWeek, endOfWeek, subWeeks, addWeeks, isWithinInterval } from 'date-fns';
@@ -870,6 +878,22 @@ export default function AdminScreen() {
           {/* Attendances Tab */}
           {activeTab === 'attendances' && (
             <ScrollView contentContainerStyle={[styles.listContent, { paddingTop: 10 }]}>
+              {/* Date navigation */}
+              <View style={[styles.dateNav, { marginBottom: 20 }]}>
+                <TouchableOpacity
+                  style={styles.dateNavBtn}
+                  onPress={() => setAttendanceDate(addDays(attendanceDate, -1))}
+                >
+                  <MaterialCommunityIcons name="chevron-left" size={22} color={colors.primary} />
+                </TouchableOpacity>
+                <Text style={styles.dateNavText}>
+                  {format(attendanceDate, "EEEE, d 'de' MMMM", { locale: es }).replace(/^\w/, c => c.toUpperCase())}
+                </Text>
+                <TouchableOpacity
+                  style={styles.dateNavBtn}
+                  onPress={() => setAttendanceDate(addDays(attendanceDate, 1))}
+                >
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
                 </TouchableOpacity>
               </View>
 
