@@ -1002,38 +1002,6 @@ export default function AdminScreen() {
           )}
         </>
       )}
-                            </Text>
-                          </View>
-                        </View>
-                        
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <MaterialCommunityIcons name="clock-outline" size={14} color={colors.textMuted} />
-                            <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '500' }}>
-                              {format(parseISO(r.timestamp), 'HH:mm:ss')}
-                            </Text>
-                          </View>
-                          {r.isActive && (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#4CAF50' }} />
-                              <Text style={{ fontSize: 11, color: '#4CAF50', fontWeight: 'bold' }}>EN EL CENTRO</Text>
-                            </View>
-                          )}
-                        </View>
-                      </View>
-                      
-                      <MaterialCommunityIcons 
-                        name={r.type === 'in' ? "login-variant" : "logout-variant"} 
-                        size={20} 
-                        color={r.type === 'in' ? colors.action : colors.warning} 
-                        style={{ marginLeft: 10, opacity: 0.6 }}
-                      />
-                    </View>
-                  ))}
-                </View>
-              )}
-            </ScrollView>
-          )}
 
           {/* Employees Tab */}
           {activeTab === 'employees' && (
