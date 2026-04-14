@@ -1,16 +1,10 @@
 # Backlog de TransferLog (Tareas y Mejoras)
 
 Este documento centraliza todas las incidencias y mejoras planificadas para el proyecto **TransferLog**.
-
 ## 🚀 Próximas Tareas (Pendientes)
 
 ### Funcionalidades Core
-- [ ] **Issue #16 - Gestión de Vacaciones Aprobadas (Control Admin):** 
-  - *Descripción:* Botón para cancelar vacaciones aprobadas y devolver días automáticamente.
-  - *Prioridad:* Alta.
-
-
-
+- Todo completado.
 
 
 ### Reportes e Ingeniería
@@ -29,6 +23,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ---
 
 ## ✅ Tareas Completadas
+- [x] **Issue #16 - Gestión de Vacaciones Aprobadas (Control Admin):** Botón para cancelar vacaciones aprobadas y devolver días automáticamente de forma segura.
 - [x] **Issue #20 - Rediseño Premium del Monitor de Fichajes:** Implementada interfaz tipo Timeline con tarjetas, avatares dinámicos e indicadores de estado activo para el administrador.
 - [x] **Issue #17 - Monitor de Fichajes (Panel Admin):** Pestaña nueva con auditoría diaria del horario exacto de entrada y salida de los empleados.
 - [x] **Issue #12 - Plantillas Horarias:** Añadidos campos `start_time` y `end_time` a turnos. Edición manual y vista explícita.

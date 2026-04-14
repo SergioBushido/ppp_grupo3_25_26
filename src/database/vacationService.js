@@ -202,10 +202,19 @@ export async function cancelVacation(vacation) {
   
   if (vacationError) throw vacationError;
 
+  // Obtener los días actuales del empleado
+  const { data: empData, error: fetchEmpError } = await supabase
+    .from('employees')
+    .select('available_days')
+    .eq('id', vacation.employee_id)
+    .single();
+
+  if (fetchEmpError) throw fetchEmpError;
+
   const { error: employeeError } = await supabase
     .from('employees')
     .update({ 
-      available_days: vacation.employees.available_days + days, 
+      available_days: empData.available_days + days, 
     })
     .eq('id', vacation.employee_id);
   

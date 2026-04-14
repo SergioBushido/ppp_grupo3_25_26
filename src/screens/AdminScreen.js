@@ -47,6 +47,8 @@ const SHIFT_OPTIONS = [
   { type: 'morning', label: 'Mañana', icon: 'weather-sunny' },
   { type: 'afternoon', label: 'Tarde', icon: 'weather-sunset' },
   { type: 'night', label: 'Noche', icon: 'weather-night' },
+];
+
 const AVATAR_COLORS = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
   '#F06292', '#AED581', '#FFD54F', '#4DB6AC', '#7986CB'
