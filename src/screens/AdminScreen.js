@@ -1000,6 +1000,8 @@ export default function AdminScreen() {
               />
             </ScrollView>
           )}
+        </>
+      )}
                   placeholderTextColor={colors.textMuted}
                 />
                 {attendanceFilter !== '' && (
