@@ -45,7 +45,8 @@ export async function generarReportePDF(empleados, opciones) {
     <head>
       <meta charset="utf-8" />
       <style>
-        body { font-family: Arial, sans-serif; margin: 24px; }
+        @page { size: A4 landscape; margin: 10mm; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
         h1 { text-align: center; margin-bottom: 8px; }
         .subtitle { text-align: center; font-size: 16px; margin-bottom: 24px; }
         table { border-collapse: collapse; width: 100%; font-size: 10px; }

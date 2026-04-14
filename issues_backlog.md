@@ -8,29 +8,6 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 
 
 
-### Reportes e Ingeniería
-- [x] **Issue #21 - Exportación mensual a PDF Detallado:**
-  - *Descripción:* Implementado sistema completo de generación y exportación de cuadrícula mensual en PDF profesional, con resumen por empleado, bloque de validación y compatibilidad móvil.
-  - *Hitos técnicos:*
-    - Instalación y configuración de expo-print y expo-sharing.
-    - Creación de servicio pdfService.js con motor HTML/CSS adaptable (28-31 días).
-    - Refactor en AdminScreen.js para construir matriz mensual desde Supabase.
-    - Integración de botón “Exportar PDF Detallado” en la pestaña de reportes.
-    - Indicador de carga y control de errores en la UI.
-    - Validación visual y funcional en dispositivos Android/iOS.
-  - *Pruebas realizadas:*
-    - Generación correcta en meses de 28, 30 y 31 días.
-    - Pruebas con pocos y muchos empleados.
-    - Validación de estructura, colores y resumen en PDF.
-    - Compartición nativa en Android/iOS (WhatsApp, Email, Archivos).
-  - *Criterios de aceptación:*
-    - El administrador puede generar el PDF de cualquier mes seleccionado.
-    - El PDF es apto para impresión y archivo oficial.
-    - La cuadrícula refleja turnos y vacaciones por empleado.
-    - El documento incluye resumen y bloque de firma/sello.
-    - El PDF se comparte correctamente desde el dispositivo.
-    - Los datos exportados coinciden con Supabase.
-  - *Estado:* Completado y documentado. Referencia commits en rama feature/pdf-export y Issue #21.
 - [ ] **Issue #11 - Suite de Pruebas:** 
   - *Descripción:* Configurar Jest y realizar tests de lógica de negocio.
   - *Prioridad:* Media.
@@ -43,6 +20,8 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ---
 
 ## ✅ Tareas Completadas
+- [x] **Issue #21 - Exportación mensual a PDF Detallado:** Sistema de generación de cuadrícula mensual en PDF con resumen, bloque de firma y compartición nativa.
+- [x] **BugFix - Sintaxis JSX y Layout en Admin (14/04):** Corrección de etiquetas `<View>` mal cerradas y refactorización de contenedores `flex: 1` para restaurar la visibilidad de la pestaña de Fichajes.
 - [x] **Issue #16 - Gestión de Vacaciones Aprobadas (Control Admin):** Botón para cancelar vacaciones aprobadas y devolver días automáticamente de forma segura.
 - [x] **Issue #20 - Rediseño Premium del Monitor de Fichajes:** Implementada interfaz tipo Timeline con tarjetas, avatares dinámicos e indicadores de estado activo para el administrador.
 - [x] **Issue #17 - Monitor de Fichajes (Panel Admin):** Pestaña nueva con auditoría diaria del horario exacto de entrada y salida de los empleados.
