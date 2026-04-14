@@ -7,10 +7,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 - Todo completado.
 
 
-### Reportes e Ingeniería
-- [ ] **Issue #14 - Exportación a PDF:** 
-  - *Descripción:* Generar cuadrícula mensual en PDF.
-  - *Prioridad:* Baja.
+
 - [ ] **Issue #11 - Suite de Pruebas:** 
   - *Descripción:* Configurar Jest y realizar tests de lógica de negocio.
   - *Prioridad:* Media.
@@ -23,6 +20,8 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ---
 
 ## ✅ Tareas Completadas
+- [x] **Issue #21 - Exportación mensual a PDF Detallado:** Sistema de generación de cuadrícula mensual en PDF con resumen, bloque de firma y compartición nativa.
+- [x] **BugFix - Sintaxis JSX y Layout en Admin (14/04):** Corrección de etiquetas `<View>` mal cerradas y refactorización de contenedores `flex: 1` para restaurar la visibilidad de la pestaña de Fichajes.
 - [x] **Issue #16 - Gestión de Vacaciones Aprobadas (Control Admin):** Botón para cancelar vacaciones aprobadas y devolver días automáticamente de forma segura.
 - [x] **Issue #20 - Rediseño Premium del Monitor de Fichajes:** Implementada interfaz tipo Timeline con tarjetas, avatares dinámicos e indicadores de estado activo para el administrador.
 - [x] **Issue #17 - Monitor de Fichajes (Panel Admin):** Pestaña nueva con auditoría diaria del horario exacto de entrada y salida de los empleados.

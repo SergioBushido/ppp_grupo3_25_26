@@ -10,7 +10,6 @@ import {
   RefreshControl,
   Alert,
   Modal,
-  TextInput,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
@@ -34,7 +33,6 @@ import { getAllEmployees } from '../database/employeeService';
 import { ShiftBadge, getShiftConfig } from '../components/ShiftBadge';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
-import { SafeAreaView } from "react-native-safe-area-context";
 
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
@@ -188,6 +186,7 @@ export default function CalendarScreen({ navigation }) {
     });
   };
 
+  // Calendar grid days
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const calStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -208,6 +207,8 @@ export default function CalendarScreen({ navigation }) {
     const hasShift = dayShifts.length > 0;
     const isSunday = day.getDay() === 0;
 
+    // A day is "Libre" if it's Sunday and has no shift/vacation, 
+    // or if we defined a "free" shift (though usually it's just empty).
     const isLibre = !hasShift && !hasVacation && isSunday;
 
     return (
@@ -269,15 +270,13 @@ export default function CalendarScreen({ navigation }) {
       }
     >
       {/* Header */}
-      <SafeAreaView edges={['top']} style={styles.safeHeader}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.primary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitleCenter}>Horario</Text>
-          <View style={{ width: 44 }} />
-        </View>
-      </SafeAreaView>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.primary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitleCenter}>Horario</Text>
+        <View style={{ width: 44 }} />
+      </View>
 
       <View style={styles.viewToggleContainer}>
         <View style={styles.viewToggle}>
@@ -319,18 +318,21 @@ export default function CalendarScreen({ navigation }) {
         <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
       ) : (
         <>
+          {/* Weekday headers */}
           <View style={styles.weekdayRow}>
             {WEEKDAYS.map((d) => (
               <Text key={d} style={styles.weekdayText}>{d}</Text>
             ))}
           </View>
 
+          {/* Calendar grid */}
           <View style={styles.calGrid}>
             {(viewMode === 'monthly' ? calDays : weekDays).map((day) =>
               renderDayCell(day, viewMode === 'monthly')
             )}
           </View>
 
+          {/* Legend */}
           <View style={styles.legend}>
             {[
               { label: 'Mañana', color: colors.morning },
@@ -345,25 +347,17 @@ export default function CalendarScreen({ navigation }) {
             ))}
           </View>
 
+          {/* Selected day detail */}
           {selectedDay && (
             <View style={styles.dayDetail}>
-              <View style={styles.dayDetailHeader}>
-                <Text style={styles.dayDetailTitle}>
-                  {format(selectedDay, "EEEE, d 'de' MMMM", { locale: es }).replace(/^\w/, c => c.toUpperCase())}
-                </Text>
-                <TouchableOpacity
-                  style={styles.closePanelBtn}
-                  onPress={() => setSelectedDay(null)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <MaterialCommunityIcons name="close" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
+              <Text style={styles.dayDetailTitle}>
+                {format(selectedDay, "EEEE, d 'de' MMMM", { locale: es }).replace(/^\w/, c => c.toUpperCase())}
+              </Text>
               {selectedDayShifts.length > 0 ? (
                 selectedDayShifts.map((s, i) => (
                   <View key={i} style={styles.dayDetailRow}>
                     <View style={styles.dayDetailInfo}>
-                      <ShiftBadge shiftType={s.shift_type} startTime={s.start_time} endTime={s.end_time} />
+                      <ShiftBadge shiftType={s.shift_type} />
                       {user.role === 'admin' && s.employee_name && (
                         <Text style={styles.empName}>{s.employee_name}</Text>
                       )}
@@ -409,7 +403,7 @@ export default function CalendarScreen({ navigation }) {
           )}
         </>
       )}
-
+      {/* Assignment Modal */}
       <Modal visible={assignmentModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -479,16 +473,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  safeHeader: {
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
   header: {
+    backgroundColor: colors.white,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   backBtn: {
     width: 44,
@@ -579,7 +572,7 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     width: '14.28%',
-    aspectRatio: 0.75,
+    aspectRatio: 0.75, // Increased height ratio to avoid clipping
     padding: 2,
     borderWidth: 0.5,
     borderColor: '#F1F5F9',
@@ -610,12 +603,12 @@ const styles = StyleSheet.create({
   dayContent: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'flex-start', // Start from top to give more space
     paddingHorizontal: 2,
     paddingTop: 4,
   },
   shiftCircle: {
-    width: 24,
+    width: 24, // Slightly smaller to fit better
     height: 24,
     borderRadius: 12,
     justifyContent: 'center',
@@ -687,27 +680,12 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginBottom: 40,
   },
-  dayDetailHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
   dayDetailTitle: {
-    flex: 1,
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.bold,
     color: colors.textPrimary,
+    marginBottom: 16,
     textTransform: 'capitalize',
-    paddingRight: 8,
-  },
-  closePanelBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   dayDetailRow: {
     flexDirection: 'row',
@@ -813,6 +791,11 @@ const styles = StyleSheet.create({
   empOptionSelected: {
     borderColor: colors.primary,
     backgroundColor: colors.background,
+  },
+  empOptionText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.medium,
+    color: colors.textSecondary,
   },
   empOptionTextSelected: {
     color: colors.primary,
