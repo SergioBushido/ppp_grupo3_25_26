@@ -1002,54 +1002,6 @@ export default function AdminScreen() {
           )}
         </>
       )}
-                  placeholderTextColor={colors.textMuted}
-                />
-                {attendanceFilter !== '' && (
-                  <TouchableOpacity onPress={() => setAttendanceFilter('')}>
-                    <MaterialCommunityIcons name="close-circle" size={18} color={colors.textMuted} />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {filteredAttendances.length === 0 ? (
-                <View style={styles.empty}>
-                  <MaterialCommunityIcons 
-                    name={attendanceFilter ? "account-search-outline" : "clock-alert-outline"} 
-                    size={60} 
-                    color={colors.textMuted} 
-                  />
-                  <Text style={styles.emptyText}>
-                    {attendanceFilter ? `No hay resultados para "${attendanceFilter}"` : "Sin actividad registrada hoy"}
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.attendanceContainer}>
-                  <View style={styles.timelineLine} />
-                  {filteredAttendances.map((r, index) => (
-                    <View key={r.id} style={styles.attendanceCard}>
-                      <View style={[styles.attendanceAvatar, { backgroundColor: getAvatarColor(r.employee_name) }]}>
-                        <Text style={styles.attendanceAvatarText}>{getInitials(r.employee_name)}</Text>
-                        {r.isActive && (
-                          <Animated.View 
-                            style={[
-                              styles.activePulse, 
-                              { transform: [{ scale: pulseAnim }], opacity: 0.8 }
-                            ]} 
-                          />
-                        )}
-                      </View>
-                      
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={[styles.shiftEmpName, { marginBottom: 2 }]}>{r.employee_name || 'Desconocido'}</Text>
-                          <View style={[styles.attendanceBadge, { backgroundColor: r.type === 'in' ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 152, 0, 0.1)' }]}>
-                            <Text style={{ 
-                              color: r.type === 'in' ? '#2E7D32' : '#E65100', 
-                              fontWeight: 'bold', 
-                              fontSize: 10,
-                              textTransform: 'uppercase'
-                            }}>
-                              {r.type === 'in' ? 'Entrada' : 'Salida'}
                             </Text>
                           </View>
                         </View>
