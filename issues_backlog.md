@@ -17,11 +17,98 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Descripción:* Implementar el sistema nativo de Supabase Auth para gestionar usuarios, sesiones persistentes y encriptación de contraseñas, vinculando el `UID` de Auth con la tabla `employees`.
   - *Prioridad:* Media.
 
+### Auditoría Técnica (15/04)
+
+#### 🔴 Urgente (Bloqueante)
+- [ ] **Issue #24 - Migrar autenticación a Supabase Auth y eliminar contraseñas en texto plano**
+  - *Área:* Seguridad y privacidad.
+  - *Severidad:* Crítica.
+  - *Tipo:* Bug confirmado.
+  - *Impacto:* Riesgo de exposición de credenciales y compromiso total de cuentas si se mantiene el modelo actual de login/password en tabla `employees`.
+  - *Módulos afectados:* `src/database/employeeService.js`, `src/context/AuthContext.js`, `src/screens/LoginScreen.js`.
+  - *Acción recomendada:* Sustituir autenticación custom por `supabase.auth`, eliminar consultas por password y persistir sesión de forma segura.
+  - *Criterio de aceptación:* No existe ninguna comparación/lectura de `password` en cliente; login, logout y cambio de contraseña funcionan con Supabase Auth y sesión persistente.
+
+- [ ] **Issue #25 - Corregir bug de fechas en edición admin de vacaciones**
+  - *Área:* Bugs y errores.
+  - *Severidad:* Alta.
+  - *Tipo:* Bug confirmado.
+  - *Impacto:* Posibles errores de ejecución y cálculos incorrectos al editar solicitudes desde Admin.
+  - *Módulos afectados:* `src/screens/AdminRequestVacationScreen.js`.
+  - *Acción recomendada:* Normalizar entradas con `parseISO` antes de usar `differenceInCalendarDays` y `format`, validando nulos.
+  - *Criterio de aceptación:* La pantalla de edición no falla y calcula correctamente días solicitados/disponibles en todos los escenarios.
+
+- [ ] **Issue #26 - Corregir lógica de validación y mensajes en editRequestVacation**
+  - *Área:* Bugs y errores.
+  - *Severidad:* Alta.
+  - *Tipo:* Bug confirmado.
+  - *Impacto:* Validaciones inconsistentes y posibilidad de saldo de vacaciones incorrecto.
+  - *Módulos afectados:* `src/database/vacationService.js`.
+  - *Acción recomendada:* Corregir variable `days` no definida en mensaje, unificar cálculo de disponibilidad con fuente de verdad en BD y simplificar la regla de negocio.
+  - *Criterio de aceptación:* Ediciones con aumento/reducción/mismo rango mantienen saldo correcto y mensajes coherentes.
+
+- [ ] **Issue #27 - Hacer transaccional la aprobación/cancelación de vacaciones**
+  - *Área:* Arquitectura y escalabilidad.
+  - *Severidad:* Alta.
+  - *Tipo:* Riesgo potencial.
+  - *Impacto:* Inconsistencias de datos si una operación parcial actualiza `vacations` pero no `employees.available_days` (o viceversa).
+  - *Módulos afectados:* `src/database/vacationService.js` y funciones SQL/RPC de Supabase.
+  - *Acción recomendada:* Encapsular cada operación en una única transacción SQL/RPC idempotente.
+  - *Criterio de aceptación:* Cada cambio de estado deja datos consistentes incluso ante fallos intermedios o reintentos.
+
+#### 🟠 Importante (Siguiente iteración)
+- [ ] **Issue #28 - Implementar sesión persistente real en AuthContext**
+  - *Área:* Seguridad y privacidad.
+  - *Severidad:* Media.
+  - *Tipo:* Deuda técnica.
+  - *Impacto:* Pérdida de sesión al reiniciar la app y mayor fragilidad del flujo de autenticación.
+  - *Módulos afectados:* `src/context/AuthContext.js`, `src/navigation/AppNavigator.js`.
+  - *Acción recomendada:* Inicializar sesión (`getSession`) y suscripción a cambios de auth (`onAuthStateChange`) desacoplando sesión de perfil.
+  - *Criterio de aceptación:* Usuario autenticado mantiene sesión tras reiniciar app y la navegación se hidrata correctamente.
+
+- [ ] **Issue #29 - Estandarizar manejo de errores y reintento en cargas de pantallas**
+  - *Área:* Bugs y errores.
+  - *Severidad:* Media.
+  - *Tipo:* Bug confirmado.
+  - *Impacto:* Estados de carga inconsistentes y mala recuperación ante fallos de red.
+  - *Módulos afectados:* `src/screens/VacationsScreen.js`, `src/screens/CalendarScreen.js` (y homogeneizar resto).
+  - *Acción recomendada:* Aplicar patrón común `try/catch/finally`, estado de error visual y CTA de reintento.
+  - *Criterio de aceptación:* Ante fallo simulado de red, la UI muestra error controlado y permite recuperar sin reiniciar app.
+
+- [ ] **Issue #30 - Configurar suite de tests para lógica de negocio**
+  - *Área:* Cobertura de tests.
+  - *Severidad:* Media.
+  - *Tipo:* Deuda técnica.
+  - *Impacto:* Alta probabilidad de regresiones en reglas críticas (vacaciones, fichajes, auth).
+  - *Módulos afectados:* `package.json`, servicios de `src/database/*`.
+  - *Acción recomendada:* Configurar `jest`/`jest-expo`, mocks de Supabase y casos de prueba críticos.
+  - *Criterio de aceptación:* La suite se ejecuta en local y cubre al menos reglas principales de vacaciones/auth/fichajes.
+
+#### 🟡 Mejora continua
+- [ ] **Issue #31 - Ocultar credenciales demo en producción**
+  - *Área:* Seguridad y privacidad.
+  - *Severidad:* Media.
+  - *Tipo:* Riesgo potencial.
+  - *Impacto:* Exposición innecesaria de cuentas de prueba en entornos no controlados.
+  - *Módulos afectados:* `src/screens/LoginScreen.js`.
+  - *Acción recomendada:* Condicionar contenido demo por entorno/feature flag y eliminar credenciales reales.
+  - *Criterio de aceptación:* Builds de producción no muestran credenciales demo en la pantalla de login.
+
+- [ ] **Issue #32 - Actualizar dependencias compatibles con Expo SDK actual**
+  - *Área:* Arquitectura y escalabilidad.
+  - *Severidad:* Baja.
+  - *Tipo:* Deuda técnica.
+  - *Impacto:* Acumulación de parches pendientes y mayor riesgo de bugs ya corregidos upstream.
+  - *Módulos afectados:* `package.json`, `package-lock.json`.
+  - *Acción recomendada:* Actualizar paquetes a versiones *wanted* compatibles con SDK actual y validar smoke tests.
+  - *Criterio de aceptación:* App compila/arranca sin regresiones y con dependencias de parche al día.
+
 ---
 
 ## ✅ Tareas Completadas
+- [x] **Cierre técnico Issue #19 (Monitor de Fichajes Admin) (15/04):** Finalización de criterios pendientes del monitor con orden cronológico consistente, refresco manual y automático cada 30s, estados de carga/error y ajuste visual de tipo de salida en color naranja para facilitar auditoría y trazabilidad diaria.
 - [x] **Issue #23 - Limpieza de SQLite y Consolidación:** Eliminación del código legado (database.js), limpieza de App.js y desinstalación de la dependencia `expo-sqlite` para optimizar el proyecto tras la migración a Supabase.
-- [x] **Issue #21 - Exportación mensual a PDF Detallado:** Sistema de generación de cuadrícula mensual en PDF con resumen, bloque de firma y compartición nativa.
+- [x] **Issue #21 - Finalización Exportación PDF y Restauración UI Premium (15/04):** Despliegue final de la lógica de generación de PDF, corrección de errores críticos de sintaxis JSX en `AdminScreen.js` y restauración de la estética Premium (Timeline y visualización dinámica) tras la limpieza de código legado.
 - [x] **BugFix - Sintaxis JSX y Layout en Admin (14/04):** Corrección de etiquetas `<View>` mal cerradas y refactorización de contenedores `flex: 1` para restaurar la visibilidad de la pestaña de Fichajes.
 - [x] **Issue #16 - Gestión de Vacaciones Aprobadas (Control Admin):** Botón para cancelar vacaciones aprobadas y devolver días automáticamente de forma segura.
 - [x] **Issue #20 - Rediseño Premium del Monitor de Fichajes:** Implementada interfaz tipo Timeline con tarjetas, avatares dinámicos e indicadores de estado activo para el administrador.
