@@ -91,6 +91,8 @@ export default function AdminScreen() {
   // Attendances monitoring
   const [attendanceDate, setAttendanceDate] = useState(new Date());
   const [dayAttendances, setDayAttendances] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceError, setAttendanceError] = useState('');
   const [activeBrush, setActiveBrush] = useState('morning');
   const [copyModalVisible, setCopyModalVisible] = useState(false);
   const [copySummary, setCopySummary] = useState({ shifts: [], conflicts: [], sourceRange: '', targetRange: '' });
@@ -284,27 +286,51 @@ export default function AdminScreen() {
   }, [selectedDate]);
 
   const loadDayAttendances = useCallback(async () => {
-    const dateStr = format(attendanceDate, 'yyyy-MM-dd');
-    const records = await getAllAttendancesByDate(dateStr);
-    
-    // Identify active employees (who have an 'in' but no 'out' yet)
-    const empStatus = {};
-    records.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(r => {
-      empStatus[r.employee_id] = r.type;
-    });
-    
-    const enrichedRecords = records.map(r => ({
-      ...r,
-      isActive: empStatus[r.employee_id] === 'in' && format(new Date(), 'yyyy-MM-dd') === dateStr
-    }));
+    setAttendanceLoading(true);
+    setAttendanceError('');
+    try {
+      const dateStr = format(attendanceDate, 'yyyy-MM-dd');
+      const records = await getAllAttendancesByDate(dateStr);
 
-    setDayAttendances(enrichedRecords);
+      // Ensure stable chronological order before computing active status.
+      const chronologicalRecords = [...records].sort(
+        (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+      );
+
+      // Identify active employees (who have an 'in' but no 'out' yet)
+      const empStatus = {};
+      chronologicalRecords.forEach((record) => {
+        empStatus[record.employee_id] = record.type;
+      });
+
+      const enrichedRecords = chronologicalRecords.map((record) => ({
+        ...record,
+        isActive:
+          empStatus[record.employee_id] === 'in' &&
+          format(new Date(), 'yyyy-MM-dd') === dateStr,
+      }));
+
+      setDayAttendances(enrichedRecords);
+    } catch (error) {
+      console.error('Error al cargar fichajes del día:', error);
+      setDayAttendances([]);
+      setAttendanceError('No se pudieron cargar los fichajes. Pulsa refrescar para reintentar.');
+    } finally {
+      setAttendanceLoading(false);
+    }
   }, [attendanceDate]);
 
   useEffect(() => {
-    if (activeTab === 'attendances') {
+    if (activeTab !== 'attendances') return undefined;
+
+    loadDayAttendances();
+
+    // Near real-time refresh while monitoring fichajes.
+    const intervalId = setInterval(() => {
       loadDayAttendances();
-    }
+    }, 30000);
+
+    return () => clearInterval(intervalId);
   }, [activeTab, loadDayAttendances]);
 
   const loadReportData = useCallback(async () => {
@@ -950,6 +976,14 @@ export default function AdminScreen() {
                     <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
                   </TouchableOpacity>
                 </View>
+                <TouchableOpacity style={styles.refreshBtn} onPress={loadDayAttendances} disabled={attendanceLoading}>
+                  {attendanceLoading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <MaterialCommunityIcons name="refresh" size={18} color={colors.primary} />
+                  )}
+                  <Text style={styles.refreshBtnText}>Refrescar fichajes</Text>
+                </TouchableOpacity>
 
                 <View style={{ marginBottom: 12 }}>
                   <TextInput
@@ -969,11 +1003,19 @@ export default function AdminScreen() {
                 <FlatList
                   data={filteredAttendances}
                   keyExtractor={(item) => String(item.id)}
+                  refreshing={attendanceLoading}
+                  onRefresh={loadDayAttendances}
                   contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
                   ListEmptyComponent={
                     <View style={styles.empty}>
-                      <MaterialCommunityIcons name="clipboard-list" size={40} color={colors.textMuted} />
-                      <Text style={styles.emptyText}>No hay fichajes para esta fecha</Text>
+                      <MaterialCommunityIcons
+                        name={attendanceError ? 'alert-circle-outline' : 'clipboard-list'}
+                        size={40}
+                        color={attendanceError ? colors.rejected : colors.textMuted}
+                      />
+                      <Text style={styles.emptyText}>
+                        {attendanceError || 'No hay fichajes para esta fecha'}
+                      </Text>
                     </View>
                   }
                   renderItem={({ item }) => {
@@ -985,8 +1027,8 @@ export default function AdminScreen() {
                           {item.isActive && <View style={styles.activePulse} />}
                         </View>
                         <View style={{ flex: 1 }}>
-                          <View style={[styles.attendanceBadge, { backgroundColor: item.type === 'in' ? colors.morning + '20' : colors.night + '20' }]}>
-                            <Text style={{ color: item.type === 'in' ? colors.morning : colors.night, fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase' }}>
+                          <View style={[styles.attendanceBadge, { backgroundColor: item.type === 'in' ? colors.morning + '20' : colors.afternoon + '20' }]}>
+                            <Text style={{ color: item.type === 'in' ? colors.morning : colors.afternoon, fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase' }}>
                               {item.type === 'in' ? 'Entrada' : 'Salida'}
                             </Text>
                           </View>
@@ -999,7 +1041,7 @@ export default function AdminScreen() {
                         <MaterialCommunityIcons 
                           name={item.type === 'in' ? "login-variant" : "logout-variant"} 
                           size={20} 
-                          color={item.type === 'in' ? colors.morning : colors.night} 
+                          color={item.type === 'in' ? colors.morning : colors.afternoon} 
                         />
                       </View>
                     );
@@ -1553,6 +1595,25 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     color: colors.textPrimary,
     textTransform: 'capitalize',
+  },
+  refreshBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.primaryLight,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  refreshBtnText: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    color: colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   shiftRow: {
     flexDirection: 'row',

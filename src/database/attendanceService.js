@@ -53,7 +53,7 @@ export async function getAllAttendancesByDate(date) {
     `)
     .gte('timestamp', dayStart.toISOString())
     .lte('timestamp', dayEnd.toISOString())
-    .order('timestamp', { ascending: false });
+    .order('timestamp', { ascending: true });
 
   if (error) throw error;
 
