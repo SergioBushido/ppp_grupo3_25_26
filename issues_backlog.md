@@ -20,6 +20,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ---
 
 ## ✅ Tareas Completadas
+- [x] **Issue #23 - Limpieza de SQLite y Consolidación:** Eliminación del código legado (database.js), limpieza de App.js y desinstalación de la dependencia `expo-sqlite` para optimizar el proyecto tras la migración a Supabase.
 - [x] **Issue #21 - Exportación mensual a PDF Detallado:** Sistema de generación de cuadrícula mensual en PDF con resumen, bloque de firma y compartición nativa.
 - [x] **BugFix - Sintaxis JSX y Layout en Admin (14/04):** Corrección de etiquetas `<View>` mal cerradas y refactorización de contenedores `flex: 1` para restaurar la visibilidad de la pestaña de Fichajes.
 - [x] **Issue #16 - Gestión de Vacaciones Aprobadas (Control Admin):** Botón para cancelar vacaciones aprobadas y devolver días automáticamente de forma segura.
