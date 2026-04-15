@@ -108,6 +108,9 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ## ✅ Tareas Completadas
 - [x] **Cierre técnico Issue #19 (Monitor de Fichajes Admin) (15/04):** Finalización de criterios pendientes del monitor con orden cronológico consistente, refresco manual y automático cada 30s, estados de carga/error y ajuste visual de tipo de salida en color naranja para facilitar auditoría y trazabilidad diaria.
 - [x] **Issue #23 - Limpieza de SQLite y Consolidación:** Eliminación del código legado (database.js), limpieza de App.js y desinstalación de la dependencia `expo-sqlite` para optimizar el proyecto tras la migración a Supabase.
+- [x] **BugFix - Arranque en rama `main` tras limpieza de SQLite (15/04):**
+  - *Incidencia:* `npx expo start` fallaba en `main` con `PluginError: Failed to resolve plugin for module "expo-sqlite"` porque `app.json` seguía referenciando el plugin tras eliminar la dependencia.
+  - *Solución:* Se alineó la configuración de Expo eliminando la referencia huérfana y dejando `plugins: []` en `app.json`, restaurando el arranque correcto del proyecto.
 - [x] **Issue #21 - Finalización Exportación PDF y Restauración UI Premium (15/04):** Despliegue final de la lógica de generación de PDF, corrección de errores críticos de sintaxis JSX en `AdminScreen.js` y restauración de la estética Premium (Timeline y visualización dinámica) tras la limpieza de código legado.
 - [x] **BugFix - Sintaxis JSX y Layout en Admin (14/04):** Corrección de etiquetas `<View>` mal cerradas y refactorización de contenedores `flex: 1` para restaurar la visibilidad de la pestaña de Fichajes.
 - [x] **Issue #16 - Gestión de Vacaciones Aprobadas (Control Admin):** Botón para cancelar vacaciones aprobadas y devolver días automáticamente de forma segura.
