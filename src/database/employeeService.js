@@ -69,20 +69,17 @@ export async function sendPasswordRecovery(email) {
 
 export async function createEmployee({ name, email, role = 'employee', available_days = 22 }) {
   const normalizedEmail = email.toLowerCase().trim();
-  const { data, error } = await supabase
-    .from('employees')
-    .insert([{
+  const { data, error } = await supabase.functions.invoke('provision-employee', {
+    body: {
       name,
       email: normalizedEmail,
       role,
       available_days,
-      requires_password_change: false,
-    }])
-    .select(EMPLOYEE_PROFILE_COLUMNS)
-    .single();
-  
+    },
+  });
+
   if (error) throw error;
-  return data.id;
+  return data;
 }
 
 export async function updateEmployee(id, fields) {

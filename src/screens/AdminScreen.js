@@ -766,13 +766,16 @@ export default function AdminScreen() {
 
     try {
       setLoading(true);
-      await createEmployee({
+      const result = await createEmployee({
         name: newName,
         email: newEmail,
         available_days: parseInt(newInitialDays, 10) || 22
       });
 
-      Alert.alert('✅ Éxito', `Perfil de empleado para ${newName} creado correctamente.`);
+      Alert.alert(
+        '✅ Éxito',
+        `Empleado ${newName} creado correctamente.\n\nContraseña temporal:\n${result.temporaryPassword}\n\nGuárdala y entrégasela al empleado. Se le pedirá cambiarla al iniciar sesión.`
+      );
       setAddEmpModalVisible(false);
       // Reset form
       setNewName('');
