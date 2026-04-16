@@ -21,15 +21,10 @@ export default function SettingsScreen() {
   
   // Settings modal
   const [passModalVisible, setPassModalVisible] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const handlePasswordChange = async () => {
-    if (!currentPassword) {
-      Alert.alert('Error', 'Debes introducir tu contraseña actual');
-      return;
-    }
     if (newPassword.length < 6) {
       Alert.alert('Error', 'La contraseña nueva debe tener al menos 6 caracteres');
       return;
@@ -40,10 +35,9 @@ export default function SettingsScreen() {
     }
 
     try {
-      await changePassword(user.id, currentPassword, newPassword);
+      await changePassword(user.id, newPassword);
       Alert.alert('Éxito', 'Tu contraseña ha sido actualizada');
       setPassModalVisible(false);
-      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error) {
@@ -52,8 +46,6 @@ export default function SettingsScreen() {
   };
 
   const isAdmin = user?.role === 'admin';
-  const firstName = user?.name?.split(' ')[0] || 'Usuario';
-
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
@@ -123,15 +115,6 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Cambiar Contraseña</Text>
             
-            <Text style={styles.modalLabel}>Contraseña Actual</Text>
-            <TextInput
-              style={styles.modalInput}
-              secureTextEntry
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              placeholder="Tu contraseña actual"
-            />
-            
             <Text style={styles.modalLabel}>Nueva Contraseña</Text>
             <TextInput
               style={styles.modalInput}
@@ -155,7 +138,6 @@ export default function SettingsScreen() {
                 style={styles.modalCancelBtn}
                 onPress={() => {
                   setPassModalVisible(false);
-                  setCurrentPassword('');
                   setNewPassword('');
                   setConfirmPassword('');
                 }}

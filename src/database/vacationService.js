@@ -115,11 +115,11 @@ export async function editRequestVacation({ vacation_id, employee_id, start_date
   }
 
   //Actualizar días
-  const { data: employeeData, error: employeeError } = await supabase
+  const { error: employeeError } = await supabase
     .from('employees')
     .update([{available_days: newAvailableDays}])
     .eq('id', employee_id)
-    .select()  
+    .select('id')
     .single();
 
   if (employeeError) throw employeeError;

@@ -9,13 +9,12 @@ import { typography } from '../theme/typography';
 
 export default function ForcePasswordChangeScreen() {
   const { user, refreshUser, logout } = useAuth();
-  const [currentPass, setCurrentPass] = useState('');
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
-    if (!currentPass || !newPass || !confirmPass) {
+    if (!newPass || !confirmPass) {
       Alert.alert('Error', 'Por favor rellena todos los campos.');
       return;
     }
@@ -30,7 +29,7 @@ export default function ForcePasswordChangeScreen() {
 
     try {
       setLoading(true);
-      await changePassword(user.id, currentPass, newPass);
+      await changePassword(user.id, newPass);
       setLoading(false);
       Alert.alert(
         '✅ Éxito', 
@@ -58,19 +57,10 @@ export default function ForcePasswordChangeScreen() {
         </View>
         <Text style={styles.title}>Cambio de Contraseña Obligatorio</Text>
         <Text style={styles.subtitle}>
-          Tu administrador ha restablecido tu contraseña. Por motivos de seguridad, debes establecer una nueva contraseña antes de continuar.
+          Debes establecer una nueva contraseña segura antes de continuar. La actualización se realiza mediante Supabase Auth.
         </Text>
 
         <View style={styles.form}>
-          <Text style={styles.label}>Contraseña Temporal</Text>
-          <TextInput
-            style={styles.input}
-            secureTextEntry
-            value={currentPass}
-            onChangeText={setCurrentPass}
-            placeholder="Introduce la contraseña temporal"
-          />
-
           <Text style={styles.label}>Nueva Contraseña</Text>
           <TextInput
             style={styles.input}

@@ -1,36 +1,112 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { loginEmployee, getEmployeeById } from '../database/employeeService';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import { getCurrentSession, getEmployeeByAuthUserId, getEmployeeById, signInWithPassword, signOut } from '../database/employeeService';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [session, setSession] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const syncProfileFromSession = useCallback(async (nextSession) => {
+    setSession(nextSession);
+
+    if (!nextSession?.user?.id) {
+      setUser(null);
+      return;
+    }
+
+    const employee = await getEmployeeByAuthUserId(nextSession.user.id);
+    setUser(employee);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const bootstrapAuth = async () => {
+      try {
+        const initialSession = await getCurrentSession();
+        if (!isMounted) return;
+        await syncProfileFromSession(initialSession);
+      } catch (e) {
+        if (!isMounted) return;
+        try {
+          await signOut();
+        } catch (_logoutError) {
+          // Ignore cleanup errors while restoring the initial session.
+        }
+        setSession(null);
+        setUser(null);
+        setError('No se pudo restaurar la sesión.');
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    bootstrapAuth();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setIsLoading(false);
+      setError(null);
+
+      syncProfileFromSession(nextSession).catch((syncError) => {
+        console.warn('Error syncing auth session', syncError);
+        setSession(nextSession);
+        setUser(null);
+        setError('La cuenta autenticada no tiene un perfil de empleado asociado.');
+        signOut().catch((logoutError) => {
+          console.warn('Error closing invalid session', logoutError);
+        });
+      });
+    });
+
+    return () => {
+      isMounted = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, [syncProfileFromSession]);
 
   const login = useCallback(async (email, password) => {
     setIsLoading(true);
     setError(null);
     try {
-      const employee = await loginEmployee(email, password);
-      if (employee) {
-        setUser(employee);
-        return true;
-      } else {
-        setError('Credenciales incorrectas. Verifica tu email y contraseña.');
-        return false;
-      }
+      const { session: nextSession } = await signInWithPassword(email, password);
+      await syncProfileFromSession(nextSession);
+      return true;
     } catch (e) {
-      setError('Error al conectar con la base de datos.');
+      const message = e?.message?.includes('Invalid login credentials')
+        ? 'Credenciales incorrectas. Verifica tu email y contraseña.'
+        : e?.message || 'No se pudo iniciar sesión.';
+
+      try {
+        await signOut();
+      } catch (_logoutError) {
+        // No-op: if login failed before creating a session there is nothing else to clean up.
+      }
+
+      setSession(null);
+      setUser(null);
+      setError(message);
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [syncProfileFromSession]);
 
-  const logout = useCallback(() => {
-    setUser(null);
-    setError(null);
+  const logout = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      await signOut();
+      setSession(null);
+      setUser(null);
+      setError(null);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   const refreshUser = useCallback(async () => {
@@ -43,8 +119,18 @@ export function AuthProvider({ children }) {
     }
   }, [user]);
 
+  const value = useMemo(() => ({
+    user,
+    session,
+    isLoading,
+    error,
+    login,
+    logout,
+    refreshUser,
+  }), [user, session, isLoading, error, login, logout, refreshUser]);
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, error, login, logout, refreshUser }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

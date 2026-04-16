@@ -1,9 +1,11 @@
 import { supabase } from '../lib/supabase';
 
+const EMPLOYEE_PROFILE_COLUMNS = 'id, name, email, role, available_days, requires_password_change, auth_user_id';
+
 export async function getAllEmployees() {
   const { data, error } = await supabase
     .from('employees')
-    .select('*')
+    .select(EMPLOYEE_PROFILE_COLUMNS)
     .order('name');
   
   if (error) throw error;
@@ -13,7 +15,7 @@ export async function getAllEmployees() {
 export async function getEmployeeById(id) {
   const { data, error } = await supabase
     .from('employees')
-    .select('*')
+    .select(EMPLOYEE_PROFILE_COLUMNS)
     .eq('id', id)
     .single();
   
@@ -21,23 +23,62 @@ export async function getEmployeeById(id) {
   return data;
 }
 
-export async function loginEmployee(email, password) {
+export async function getEmployeeByAuthUserId(authUserId) {
   const { data, error } = await supabase
     .from('employees')
-    .select('*')
-    .eq('email', email.toLowerCase().trim())
-    .eq('password', password)
+    .select(EMPLOYEE_PROFILE_COLUMNS)
+    .eq('auth_user_id', authUserId)
     .single();
-  
-  if (error) return null; // Retornar null si no hay coincidencia (comportamiento previo)
+
+  if (error) throw error;
   return data;
 }
 
-export async function createEmployee({ name, email, password, role = 'employee', available_days = 22 }) {
+export async function signInWithPassword(email, password) {
+  const normalizedEmail = email.toLowerCase().trim();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: normalizedEmail,
+    password,
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+export async function getCurrentSession() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return data.session;
+}
+
+export async function updateAuthPassword(newPassword) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+}
+
+export async function sendPasswordRecovery(email) {
+  const normalizedEmail = email.toLowerCase().trim();
+  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+  if (error) throw error;
+}
+
+export async function createEmployee({ name, email, role = 'employee', available_days = 22 }) {
+  const normalizedEmail = email.toLowerCase().trim();
   const { data, error } = await supabase
     .from('employees')
-    .insert([{ name, email: email.toLowerCase().trim(), password, role, available_days }])
-    .select()
+    .insert([{
+      name,
+      email: normalizedEmail,
+      role,
+      available_days,
+      requires_password_change: false,
+    }])
+    .select(EMPLOYEE_PROFILE_COLUMNS)
     .single();
   
   if (error) throw error;
@@ -45,9 +86,10 @@ export async function createEmployee({ name, email, password, role = 'employee',
 }
 
 export async function updateEmployee(id, fields) {
+  const { password, ...safeFields } = fields;
   const { error } = await supabase
     .from('employees')
-    .update(fields)
+    .update(safeFields)
     .eq('id', id);
   
   if (error) throw error;
@@ -71,41 +113,35 @@ export async function deleteEmployee(id) {
   if (error) throw error;
 }
 
-export async function changePassword(employeeId, currentPassword, newPassword) {
-  // First verify the current password
-  const { data: user, error: fetchError } = await supabase
-    .from('employees')
-    .select('password')
-    .eq('id', employeeId)
-    .single();
-    
-  if (fetchError || !user) throw new Error('Usuario no encontrado');
-  
-  if (user.password !== currentPassword) {
-    throw new Error('La contraseña actual es incorrecta');
-  }
-
-  // If ok, update to new
+export async function clearPasswordChangeRequirement(employeeId) {
   const { error } = await supabase
     .from('employees')
-    .update({ 
-      password: newPassword,
-      requires_password_change: false 
+    .update({
+      requires_password_change: false,
     })
     .eq('id', employeeId);
     
-  if (error) throw new Error('Error al actualizar la base de datos');
+  if (error) throw error;
 }
 
-export async function resetEmployeePassword(employeeId, tempPassword) {
+export async function markPasswordChangeRequired(employeeId) {
   const { error } = await supabase
     .from('employees')
-    .update({ 
-      password: tempPassword,
-      requires_password_change: true 
+    .update({
+      requires_password_change: true,
     })
     .eq('id', employeeId);
     
-  if (error) throw new Error('Error al restablecer la contraseña');
+  if (error) throw error;
+}
+
+export async function changePassword(employeeId, newPassword) {
+  await updateAuthPassword(newPassword);
+  await clearPasswordChangeRequirement(employeeId);
+}
+
+export async function resetEmployeePassword(employeeId, email) {
+  await markPasswordChangeRequired(employeeId);
+  await sendPasswordRecovery(email);
 }
 

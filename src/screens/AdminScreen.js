@@ -91,8 +91,6 @@ export default function AdminScreen() {
   // Attendances monitoring
   const [attendanceDate, setAttendanceDate] = useState(new Date());
   const [dayAttendances, setDayAttendances] = useState([]);
-  const [attendanceLoading, setAttendanceLoading] = useState(false);
-  const [attendanceError, setAttendanceError] = useState('');
   const [activeBrush, setActiveBrush] = useState('morning');
   const [copyModalVisible, setCopyModalVisible] = useState(false);
   const [copySummary, setCopySummary] = useState({ shifts: [], conflicts: [], sourceRange: '', targetRange: '' });
@@ -158,7 +156,6 @@ export default function AdminScreen() {
   const [addEmpModalVisible, setAddEmpModalVisible] = useState(false);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  const [newPass, setNewPass] = useState('');
   const [newInitialDays, setNewInitialDays] = useState('22');
 
   // Reports
@@ -286,51 +283,27 @@ export default function AdminScreen() {
   }, [selectedDate]);
 
   const loadDayAttendances = useCallback(async () => {
-    setAttendanceLoading(true);
-    setAttendanceError('');
-    try {
-      const dateStr = format(attendanceDate, 'yyyy-MM-dd');
-      const records = await getAllAttendancesByDate(dateStr);
+    const dateStr = format(attendanceDate, 'yyyy-MM-dd');
+    const records = await getAllAttendancesByDate(dateStr);
+    
+    // Identify active employees (who have an 'in' but no 'out' yet)
+    const empStatus = {};
+    records.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(r => {
+      empStatus[r.employee_id] = r.type;
+    });
+    
+    const enrichedRecords = records.map(r => ({
+      ...r,
+      isActive: empStatus[r.employee_id] === 'in' && format(new Date(), 'yyyy-MM-dd') === dateStr
+    }));
 
-      // Ensure stable chronological order before computing active status.
-      const chronologicalRecords = [...records].sort(
-        (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
-      );
-
-      // Identify active employees (who have an 'in' but no 'out' yet)
-      const empStatus = {};
-      chronologicalRecords.forEach((record) => {
-        empStatus[record.employee_id] = record.type;
-      });
-
-      const enrichedRecords = chronologicalRecords.map((record) => ({
-        ...record,
-        isActive:
-          empStatus[record.employee_id] === 'in' &&
-          format(new Date(), 'yyyy-MM-dd') === dateStr,
-      }));
-
-      setDayAttendances(enrichedRecords);
-    } catch (error) {
-      console.error('Error al cargar fichajes del día:', error);
-      setDayAttendances([]);
-      setAttendanceError('No se pudieron cargar los fichajes. Pulsa refrescar para reintentar.');
-    } finally {
-      setAttendanceLoading(false);
-    }
+    setDayAttendances(enrichedRecords);
   }, [attendanceDate]);
 
   useEffect(() => {
-    if (activeTab !== 'attendances') return undefined;
-
-    loadDayAttendances();
-
-    // Near real-time refresh while monitoring fichajes.
-    const intervalId = setInterval(() => {
+    if (activeTab === 'attendances') {
       loadDayAttendances();
-    }, 30000);
-
-    return () => clearInterval(intervalId);
+    }
   }, [activeTab, loadDayAttendances]);
 
   const loadReportData = useCallback(async () => {
@@ -760,7 +733,7 @@ export default function AdminScreen() {
   const handleResetPassword = () => {
     Alert.alert(
       'Restablecer Contraseña',
-      `¿Generar una nueva contraseña temporal para ${editingEmployee.name}? Se le pedirá que la cambie en su próximo inicio de sesión.`,
+      `Se enviará un correo de recuperación seguro a ${editingEmployee.name} y se marcará el cambio de contraseña como obligatorio.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -768,23 +741,16 @@ export default function AdminScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Generate a 6-character random password
-              const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-              let tempPass = '';
-              for (let i = 0; i < 6; i++) {
-                tempPass += chars.charAt(Math.floor(Math.random() * chars.length));
-              }
-
-              await resetEmployeePassword(editingEmployee.id, tempPass);
+              await resetEmployeePassword(editingEmployee.id, editingEmployee.email);
               
               Alert.alert(
-                'Contraseña Restablecida',
-                `La nueva contraseña temporal para ${editingEmployee.name} es:\n\n${tempPass}\n\nPor favor, cópiala y entrégasela al empleado.`,
+                'Correo de recuperación enviado',
+                `Se ha enviado un enlace de restablecimiento a ${editingEmployee.email}.`,
                 [{ text: 'Entendido' }]
               );
               setEditModalVisible(false);
             } catch (e) {
-              Alert.alert('Error', 'No se pudo restablecer la contraseña.');
+              Alert.alert('Error', e.message || 'No se pudo iniciar la recuperación de contraseña.');
             }
           }
         }
@@ -793,7 +759,7 @@ export default function AdminScreen() {
   };
 
   const handleCreateEmployee = async () => {
-    if (!newName || !newEmail || !newPass) {
+    if (!newName || !newEmail) {
       Alert.alert('Error', 'Por favor, rellena todos los campos.');
       return;
     }
@@ -803,16 +769,14 @@ export default function AdminScreen() {
       await createEmployee({
         name: newName,
         email: newEmail,
-        password: newPass,
         available_days: parseInt(newInitialDays, 10) || 22
       });
 
-      Alert.alert('✅ Éxito', `Empleado ${newName} creado correctamente.`);
+      Alert.alert('✅ Éxito', `Perfil de empleado para ${newName} creado correctamente.`);
       setAddEmpModalVisible(false);
       // Reset form
       setNewName('');
       setNewEmail('');
-      setNewPass('');
       setNewInitialDays('22');
 
       await loadAll();
@@ -823,7 +787,11 @@ export default function AdminScreen() {
     }
   };
 
-
+  useFocusEffect(
+    useCallback(() => {
+      loadAll();
+    }, [loadAll])
+  );
 
   return (
     <View style={styles.container}>
@@ -965,89 +933,51 @@ export default function AdminScreen() {
 
           {/* Attendances Tab */}
           {activeTab === 'attendances' && (
-            <View style={{ flex: 1 }}>
-              <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
-                <View style={styles.dateNav}>
-                  <TouchableOpacity style={styles.dateNavBtn} onPress={() => setAttendanceDate(addDays(attendanceDate, -1))}>
-                    <MaterialCommunityIcons name="chevron-left" size={22} color={colors.primary} />
-                  </TouchableOpacity>
-                  <Text style={styles.dateNavText}>{format(attendanceDate, "EEEE, d 'de' MMMM", { locale: es }).replace(/^\w/, c => c.toUpperCase())}</Text>
-                  <TouchableOpacity style={styles.dateNavBtn} onPress={() => setAttendanceDate(addDays(attendanceDate, 1))}>
-                    <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
-                  </TouchableOpacity>
-                </View>
-                <TouchableOpacity style={styles.refreshBtn} onPress={loadDayAttendances} disabled={attendanceLoading}>
-                  {attendanceLoading ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <MaterialCommunityIcons name="refresh" size={18} color={colors.primary} />
-                  )}
-                  <Text style={styles.refreshBtnText}>Refrescar fichajes</Text>
+            <View style={styles.listContent}>
+              <View style={styles.dateNav}>
+                <TouchableOpacity style={styles.dateNavBtn} onPress={() => setAttendanceDate(addDays(attendanceDate, -1))}>
+                  <MaterialCommunityIcons name="chevron-left" size={22} color={colors.primary} />
                 </TouchableOpacity>
-
-                <View style={{ marginBottom: 12 }}>
-                  <TextInput
-                    placeholder="Buscar empleado..."
-                    value={attendanceFilter}
-                    onChangeText={setAttendanceFilter}
-                    style={[styles.formInput, { marginBottom: 8 }]}
-                  />
-                  <Animated.View style={{ transform: [{ scale: pulseAnim }], alignItems: 'center' }}>
-                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>Fichajes del día</Text>
-                  </Animated.View>
-                </View>
+                <Text style={styles.dateNavText}>{format(attendanceDate, "EEEE, d 'de' MMMM", { locale: es }).replace(/^\w/, c => c.toUpperCase())}</Text>
+                <TouchableOpacity style={styles.dateNavBtn} onPress={() => setAttendanceDate(addDays(attendanceDate, 1))}>
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
+                </TouchableOpacity>
               </View>
 
-              <View style={{ flex: 1 }}>
-                <View style={[styles.timelineLine, { left: 38 }]} />
+              <View style={{ marginBottom: 12 }}>
+                <TextInput
+                  placeholder="Buscar empleado..."
+                  value={attendanceFilter}
+                  onChangeText={setAttendanceFilter}
+                  style={[styles.formInput, { marginBottom: 8 }]}
+                />
+                <Animated.View style={{ transform: [{ scale: pulseAnim }], alignItems: 'center' }}>
+                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>Fichajes del día</Text>
+                </Animated.View>
+              </View>
+
+              {filteredAttendances.length === 0 ? (
+                <View style={styles.empty}>
+                  <MaterialCommunityIcons name="clipboard-list" size={40} color={colors.textMuted} />
+                  <Text style={styles.emptyText}>No hay fichajes para esta fecha</Text>
+                </View>
+              ) : (
                 <FlatList
                   data={filteredAttendances}
                   keyExtractor={(item) => String(item.id)}
-                  refreshing={attendanceLoading}
-                  onRefresh={loadDayAttendances}
-                  contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
-                  ListEmptyComponent={
-                    <View style={styles.empty}>
-                      <MaterialCommunityIcons
-                        name={attendanceError ? 'alert-circle-outline' : 'clipboard-list'}
-                        size={40}
-                        color={attendanceError ? colors.rejected : colors.textMuted}
-                      />
-                      <Text style={styles.emptyText}>
-                        {attendanceError || 'No hay fichajes para esta fecha'}
-                      </Text>
-                    </View>
-                  }
-                  renderItem={({ item }) => {
-                    const name = item.employee_name || item.employees?.name || 'Empleado';
-                    return (
-                      <View style={styles.attendanceCard}>
-                        <View style={[styles.attendanceAvatar, { backgroundColor: getAvatarColor(name) }]}>
-                          <Text style={styles.attendanceAvatarText}>{getInitials(name)}</Text>
-                          {item.isActive && <View style={styles.activePulse} />}
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <View style={[styles.attendanceBadge, { backgroundColor: item.type === 'in' ? colors.morning + '20' : colors.afternoon + '20' }]}>
-                            <Text style={{ color: item.type === 'in' ? colors.morning : colors.afternoon, fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase' }}>
-                              {item.type === 'in' ? 'Entrada' : 'Salida'}
-                            </Text>
-                          </View>
-                          <Text style={{ fontWeight: 'bold', color: colors.textPrimary, fontSize: 15 }}>{name}</Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                            <MaterialCommunityIcons name="clock-outline" size={14} color={colors.textMuted} />
-                            <Text style={{ color: colors.textMuted, fontSize: 12, marginLeft: 4 }}>{format(parseISO(item.timestamp), "HH:mm:ss")}</Text>
-                          </View>
-                        </View>
-                        <MaterialCommunityIcons 
-                          name={item.type === 'in' ? "login-variant" : "logout-variant"} 
-                          size={20} 
-                          color={item.type === 'in' ? colors.morning : colors.afternoon} 
-                        />
+                  renderItem={({ item }) => (
+                    <View style={styles.shiftRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontWeight: typography.weights.bold }}>{item.employee_name}</Text>
+                        <Text style={{ color: colors.textMuted }}>{format(parseISO(item.timestamp), "HH:mm:ss")}</Text>
                       </View>
-                    );
-                  }}
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ color: item.type === 'in' ? colors.morning : colors.night, fontWeight: 'bold' }}>{item.type === 'in' ? 'Entrada' : 'Salida'}</Text>
+                      </View>
+                    </View>
+                  )}
                 />
-              </View>
+              )}
             </View>
           )}
 
@@ -1111,39 +1041,6 @@ export default function AdminScreen() {
                   <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
                 </TouchableOpacity>
               </View>
-
-              {/* Botón de exportación PDF */}
-              <TouchableOpacity
-                style={{
-                  backgroundColor: colors.primary,
-                  padding: 14,
-                  borderRadius: 14,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 16,
-                  gap: 8,
-                  shadowColor: colors.primary,
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 8,
-                  elevation: 4
-                }}
-                onPress={handleExportarPDF}
-                disabled={exportandoPDF}
-              >
-                {exportandoPDF ? (
-                  <ActivityIndicator size="small" color={colors.white} />
-                ) : (
-                  <>
-                    <MaterialCommunityIcons name="file-pdf-box" size={22} color={colors.white} />
-                    <Text style={{ color: colors.white, fontWeight: 'bold', fontSize: 16 }}>
-                      Exportar PDF Detallado
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
 
               {reportData.length === 0 ? (
                 <View style={styles.empty}>
@@ -1342,7 +1239,7 @@ export default function AdminScreen() {
           <View style={[styles.modal, { maxHeight: '90%' }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={styles.modalTitle}>Nuevo Empleado</Text>
-              <Text style={styles.modalSubtitle}>Crea un nuevo perfil de acceso</Text>
+              <Text style={styles.modalSubtitle}>Crea el perfil del empleado. El acceso se gestiona desde Supabase Auth.</Text>
 
               <Text style={styles.modalLabel}>Nombre Completo</Text>
               <TextInput
@@ -1360,15 +1257,6 @@ export default function AdminScreen() {
                 onChangeText={setNewEmail}
                 autoCapitalize="none"
                 keyboardType="email-address"
-              />
-
-              <Text style={styles.modalLabel}>Contraseña Inicial</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="Mínimo 6 caracteres"
-                value={newPass}
-                onChangeText={setNewPass}
-                secureTextEntry
               />
 
               <Text style={styles.modalLabel}>Días de Vacaciones (Anual)</Text>
@@ -1595,25 +1483,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     color: colors.textPrimary,
     textTransform: 'capitalize',
-  },
-  refreshBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.primaryLight,
-    paddingVertical: 10,
-    marginBottom: 12,
-  },
-  refreshBtnText: {
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold,
-    color: colors.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
   },
   shiftRow: {
     flexDirection: 'row',
