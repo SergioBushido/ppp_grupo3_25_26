@@ -111,7 +111,7 @@ export async function editRequestVacation({ vacation_id, employee_id, start_date
   if (empError || !emp) throw new Error('Empleado no encontrado');
   
   if (available_days < newDays) {
-    throw new Error(`No tienes suficientes días disponibles. Necesitas ${days}, tienes ${emp.available_days}.`);
+    throw new Error(`No tienes suficientes días disponibles. Necesitas ${newDays}, tienes ${emp.available_days}.`);
   }
 
   //Actualizar días
@@ -124,7 +124,7 @@ export async function editRequestVacation({ vacation_id, employee_id, start_date
 
   if (employeeError) throw employeeError;
 
-    const { data: vacationData, error: vacationError } = await supabase
+  const { data: vacationData, error: vacationError } = await supabase
     .from('vacations')
     .update([{ start_date, end_date}])
     .eq('id', vacation_id)
@@ -133,7 +133,7 @@ export async function editRequestVacation({ vacation_id, employee_id, start_date
   
   if (vacationError) throw vacationError;
 
-  return employeeData.id;
+  return vacationData.id;
 }
 
 export async function approveVacation(vacationId) {
