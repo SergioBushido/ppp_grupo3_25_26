@@ -11,9 +11,11 @@ import {
   StatusBar,
   ScrollView,
   Image,
+  Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { sendPasswordRecovery } from '../database/employeeService';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 
@@ -26,6 +28,20 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) return;
     await login(email, password);
+  };
+
+  const handleRecovery = async () => {
+    if (!email.trim()) {
+      Alert.alert('Recuperar acceso', 'Introduce tu correo para enviarte el enlace de restablecimiento.');
+      return;
+    }
+
+    try {
+      await sendPasswordRecovery(email);
+      Alert.alert('Correo enviado', 'Revisa tu bandeja de entrada para restablecer tu contraseña con Supabase Auth.');
+    } catch (recoveryError) {
+      Alert.alert('Error', recoveryError.message || 'No se pudo enviar el correo de recuperación.');
+    }
   };
 
   return (
@@ -118,11 +134,14 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Demo hint */}
+          <TouchableOpacity style={styles.recoveryBtn} onPress={handleRecovery} disabled={isLoading}>
+            <Text style={styles.recoveryText}>He olvidado mi contraseña</Text>
+          </TouchableOpacity>
+
           <View style={styles.demoBox}>
-            <Text style={styles.demoTitle}>Cuentas de prueba</Text>
-            <Text style={styles.demoItem}>👔 Admin: admin@transferlog.com / admin123</Text>
-            <Text style={styles.demoItem}>👤 Empleado: juan@transferlog.com / pass123</Text>
+            <Text style={styles.demoTitle}>Autenticación segura</Text>
+            <Text style={styles.demoItem}>El acceso se valida con Supabase Auth.</Text>
+            <Text style={styles.demoItem}>El perfil del empleado se carga por email tras iniciar sesión.</Text>
           </View>
         </View>
       </ScrollView>
@@ -256,6 +275,15 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.sizes.lg,
     fontWeight: typography.weights.bold,
+  },
+  recoveryBtn: {
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  recoveryText: {
+    color: colors.primary,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
   },
   demoBox: {
     marginTop: 20,

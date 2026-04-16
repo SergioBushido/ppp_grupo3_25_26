@@ -13,21 +13,21 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Prioridad:* Media.
 
 ### Seguridad y Autenticación
-- [ ] **Issue #18 - Migración a Supabase Auth:** 
-  - *Descripción:* Implementar el sistema nativo de Supabase Auth para gestionar usuarios, sesiones persistentes y encriptación de contraseñas, vinculando el `UID` de Auth con la tabla `employees`.
+- [x] **Issue #18 - Migración a Supabase Auth:** 
+  - *Descripción:* Implementado el sistema nativo de Supabase Auth para gestionar usuarios, sesiones persistentes y cambio de contraseña, vinculando `auth.users.id` con la tabla `employees.auth_user_id`.
   - *Prioridad:* Media.
 
 ### Auditoría Técnica (15/04)
 
 #### 🔴 Urgente (Bloqueante)
-- [ ] **Issue #24 - Migrar autenticación a Supabase Auth y eliminar contraseñas en texto plano**
+- [x] **Issue #24 - Migrar autenticación a Supabase Auth y eliminar contraseñas en texto plano**
   - *Área:* Seguridad y privacidad.
   - *Severidad:* Crítica.
   - *Tipo:* Bug confirmado.
   - *Impacto:* Riesgo de exposición de credenciales y compromiso total de cuentas si se mantiene el modelo actual de login/password en tabla `employees`.
   - *Módulos afectados:* `src/database/employeeService.js`, `src/context/AuthContext.js`, `src/screens/LoginScreen.js`.
-  - *Acción recomendada:* Sustituir autenticación custom por `supabase.auth`, eliminar consultas por password y persistir sesión de forma segura.
-  - *Criterio de aceptación:* No existe ninguna comparación/lectura de `password` en cliente; login, logout y cambio de contraseña funcionan con Supabase Auth y sesión persistente.
+  - *Acción aplicada:* Sustituida la autenticación custom por `supabase.auth`, eliminadas consultas por password en cliente, enlazado el perfil por `auth_user_id` y eliminada la columna `password` de `employees`.
+  - *Criterio de aceptación:* Cumplido. No existe ninguna comparación/lectura de `password` en cliente; login, logout y cambio de contraseña funcionan con Supabase Auth y sesión persistente.
 
 - [ ] **Issue #25 - Corregir bug de fechas en edición admin de vacaciones**
   - *Área:* Bugs y errores.
@@ -38,14 +38,14 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción recomendada:* Normalizar entradas con `parseISO` antes de usar `differenceInCalendarDays` y `format`, validando nulos.
   - *Criterio de aceptación:* La pantalla de edición no falla y calcula correctamente días solicitados/disponibles en todos los escenarios.
 
-- [ ] **Issue #26 - Corregir lógica de validación y mensajes en editRequestVacation**
+- [x] **Issue #26 - Corregir lógica de validación y mensajes en editRequestVacation**
   - *Área:* Bugs y errores.
   - *Severidad:* Alta.
   - *Tipo:* Bug confirmado.
   - *Impacto:* Validaciones inconsistentes y posibilidad de saldo de vacaciones incorrecto.
   - *Módulos afectados:* `src/database/vacationService.js`.
-  - *Acción recomendada:* Corregir variable `days` no definida en mensaje, unificar cálculo de disponibilidad con fuente de verdad en BD y simplificar la regla de negocio.
-  - *Criterio de aceptación:* Ediciones con aumento/reducción/mismo rango mantienen saldo correcto y mensajes coherentes.
+  - *Acción aplicada:* Corregida la variable `days` no definida en mensajes y corregido el retorno inválido de `editRequestVacation`.
+  - *Criterio de aceptación:* Cumplido parcialmente. Los mensajes y el retorno ya son coherentes; queda recomendable revisar a futuro la regla de negocio completa del saldo en escenarios complejos.
 
 - [ ] **Issue #27 - Hacer transaccional la aprobación/cancelación de vacaciones**
   - *Área:* Arquitectura y escalabilidad.
@@ -57,14 +57,14 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Criterio de aceptación:* Cada cambio de estado deja datos consistentes incluso ante fallos intermedios o reintentos.
 
 #### 🟠 Importante (Siguiente iteración)
-- [ ] **Issue #28 - Implementar sesión persistente real en AuthContext**
+- [x] **Issue #28 - Implementar sesión persistente real en AuthContext**
   - *Área:* Seguridad y privacidad.
   - *Severidad:* Media.
   - *Tipo:* Deuda técnica.
   - *Impacto:* Pérdida de sesión al reiniciar la app y mayor fragilidad del flujo de autenticación.
   - *Módulos afectados:* `src/context/AuthContext.js`, `src/navigation/AppNavigator.js`.
-  - *Acción recomendada:* Inicializar sesión (`getSession`) y suscripción a cambios de auth (`onAuthStateChange`) desacoplando sesión de perfil.
-  - *Criterio de aceptación:* Usuario autenticado mantiene sesión tras reiniciar app y la navegación se hidrata correctamente.
+  - *Acción aplicada:* Inicialización de sesión con `getSession`, suscripción a `onAuthStateChange`, persistencia mediante `AsyncStorage` y desacoplamiento entre sesión Auth y perfil de empleado.
+  - *Criterio de aceptación:* Cumplido. El usuario autenticado mantiene sesión tras reiniciar app y la navegación se hidrata correctamente.
 
 - [ ] **Issue #29 - Estandarizar manejo de errores y reintento en cargas de pantallas**
   - *Área:* Bugs y errores.
@@ -85,14 +85,14 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Criterio de aceptación:* La suite se ejecuta en local y cubre al menos reglas principales de vacaciones/auth/fichajes.
 
 #### 🟡 Mejora continua
-- [ ] **Issue #31 - Ocultar credenciales demo en producción**
+- [x] **Issue #31 - Ocultar credenciales demo en producción**
   - *Área:* Seguridad y privacidad.
   - *Severidad:* Media.
   - *Tipo:* Riesgo potencial.
   - *Impacto:* Exposición innecesaria de cuentas de prueba en entornos no controlados.
   - *Módulos afectados:* `src/screens/LoginScreen.js`.
-  - *Acción recomendada:* Condicionar contenido demo por entorno/feature flag y eliminar credenciales reales.
-  - *Criterio de aceptación:* Builds de producción no muestran credenciales demo en la pantalla de login.
+  - *Acción aplicada:* Eliminadas las credenciales demo visibles del login y sustituido el bloque informativo por una nota de autenticación segura.
+  - *Criterio de aceptación:* Cumplido. La pantalla de login ya no muestra credenciales demo.
 
 - [ ] **Issue #32 - Actualizar dependencias compatibles con Expo SDK actual**
   - *Área:* Arquitectura y escalabilidad.
@@ -106,6 +106,11 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ---
 
 ## ✅ Tareas Completadas
+- [x] **Cierre de seguridad Auth / RLS (16/04):** Migración completa del login a Supabase Auth, persistencia de sesión con `AsyncStorage`, enlace de perfiles mediante `employees.auth_user_id`, creación segura de empleados mediante Edge Function `provision-employee`, eliminación del campo `password` en `employees` y definición de políticas RLS para `employees`, `shifts`, `vacations` y `attendances`.
+- [x] **Resumen breve de auditoría técnica Auth (16/04):**
+  - *Hallazgos:* Existía autenticación custom contra `employees.password`, cambio/reset de contraseña desde cliente y acoplamiento entre credenciales y perfil.
+  - *Problemas encontrados:* Riesgo crítico de exposición de credenciales, cuentas nuevas sin usuario Auth asociado, ausencia de RLS y bug en `editRequestVacation` por variables inconsistentes.
+  - *Soluciones aplicadas:* Supabase Auth como fuente única de autenticación, Edge Function para provisionado seguro, migración a `auth_user_id`, sesión persistente real, eliminación de credenciales demo, RLS por rol/propiedad y corrección del bug en edición de vacaciones.
 - [x] **Cierre técnico Issue #19 (Monitor de Fichajes Admin) (15/04):** Finalización de criterios pendientes del monitor con orden cronológico consistente, refresco manual y automático cada 30s, estados de carga/error y ajuste visual de tipo de salida en color naranja para facilitar auditoría y trazabilidad diaria.
 - [x] **Issue #23 - Limpieza de SQLite y Consolidación:** Eliminación del código legado (database.js), limpieza de App.js y desinstalación de la dependencia `expo-sqlite` para optimizar el proyecto tras la migración a Supabase.
 - [x] **Issue #21 - Finalización Exportación PDF y Restauración UI Premium (15/04):** Despliegue final de la lógica de generación de PDF, corrección de errores críticos de sintaxis JSX en `AdminScreen.js` y restauración de la estética Premium (Timeline y visualización dinámica) tras la limpieza de código legado.
