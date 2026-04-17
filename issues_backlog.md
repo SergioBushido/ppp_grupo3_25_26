@@ -13,14 +13,14 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Prioridad:* Media.
 
 ### Seguridad y Autenticación
-- [x] **Issue #18 - Migración a Supabase Auth:** 
+- [x] **Issue #28 - Migración a Supabase Auth:** 
   - *Descripción:* Implementado el sistema nativo de Supabase Auth para gestionar usuarios, sesiones persistentes y cambio de contraseña, vinculando `auth.users.id` con la tabla `employees.auth_user_id`.
   - *Prioridad:* Media.
 
 ### Auditoría Técnica (15/04)
 
 #### 🔴 Urgente (Bloqueante)
-- [x] **Issue #24 - Migrar autenticación a Supabase Auth y eliminar contraseñas en texto plano**
+- [x] **Issue #28 - Migrar autenticación a Supabase Auth y eliminar contraseñas en texto plano**
   - *Área:* Seguridad y privacidad.
   - *Severidad:* Crítica.
   - *Tipo:* Bug confirmado.
@@ -29,7 +29,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción aplicada:* Sustituida la autenticación custom por `supabase.auth`, eliminadas consultas por password en cliente, enlazado el perfil por `auth_user_id` y eliminada la columna `password` de `employees`.
   - *Criterio de aceptación:* Cumplido. No existe ninguna comparación/lectura de `password` en cliente; login, logout y cambio de contraseña funcionan con Supabase Auth y sesión persistente.
 
-- [ ] **Issue #25 - Corregir bug de fechas en edición admin de vacaciones**
+- [ ] **Issue #31 - Corregir bug de fechas en edición admin de vacaciones**
   - *Área:* Bugs y errores.
   - *Severidad:* Alta.
   - *Tipo:* Bug confirmado.
@@ -38,7 +38,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción recomendada:* Normalizar entradas con `parseISO` antes de usar `differenceInCalendarDays` y `format`, validando nulos.
   - *Criterio de aceptación:* La pantalla de edición no falla y calcula correctamente días solicitados/disponibles en todos los escenarios.
 
-- [x] **Issue #26 - Corregir lógica de validación y mensajes en editRequestVacation**
+- [x] **Bugfix interno - Corregir lógica de validación y mensajes en `editRequestVacation`**
   - *Área:* Bugs y errores.
   - *Severidad:* Alta.
   - *Tipo:* Bug confirmado.
@@ -47,7 +47,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción aplicada:* Corregida la variable `days` no definida en mensajes y corregido el retorno inválido de `editRequestVacation`.
   - *Criterio de aceptación:* Cumplido parcialmente. Los mensajes y el retorno ya son coherentes; queda recomendable revisar a futuro la regla de negocio completa del saldo en escenarios complejos.
 
-- [ ] **Issue #27 - Hacer transaccional la aprobación/cancelación de vacaciones**
+- [ ] **Issue #30 - Hacer transaccional la aprobación/cancelación de vacaciones**
   - *Área:* Arquitectura y escalabilidad.
   - *Severidad:* Alta.
   - *Tipo:* Riesgo potencial.
@@ -66,7 +66,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción aplicada:* Inicialización de sesión con `getSession`, suscripción a `onAuthStateChange`, persistencia mediante `AsyncStorage` y desacoplamiento entre sesión Auth y perfil de empleado.
   - *Criterio de aceptación:* Cumplido. El usuario autenticado mantiene sesión tras reiniciar app y la navegación se hidrata correctamente.
 
-- [ ] **Issue #29 - Estandarizar manejo de errores y reintento en cargas de pantallas**
+- [ ] **Tarea técnica - Estandarizar manejo de errores y reintento en cargas de pantallas**
   - *Área:* Bugs y errores.
   - *Severidad:* Media.
   - *Tipo:* Bug confirmado.
@@ -75,7 +75,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción recomendada:* Aplicar patrón común `try/catch/finally`, estado de error visual y CTA de reintento.
   - *Criterio de aceptación:* Ante fallo simulado de red, la UI muestra error controlado y permite recuperar sin reiniciar app.
 
-- [ ] **Issue #30 - Configurar suite de tests para lógica de negocio**
+- [ ] **Issue #11 - Configurar suite de tests para lógica de negocio**
   - *Área:* Cobertura de tests.
   - *Severidad:* Media.
   - *Tipo:* Deuda técnica.
@@ -85,7 +85,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Criterio de aceptación:* La suite se ejecuta en local y cubre al menos reglas principales de vacaciones/auth/fichajes.
 
 #### 🟡 Mejora continua
-- [x] **Issue #31 - Ocultar credenciales demo en producción**
+- [x] **Mejora interna - Ocultar credenciales demo en producción**
   - *Área:* Seguridad y privacidad.
   - *Severidad:* Media.
   - *Tipo:* Riesgo potencial.
@@ -94,7 +94,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción aplicada:* Eliminadas las credenciales demo visibles del login y sustituido el bloque informativo por una nota de autenticación segura.
   - *Criterio de aceptación:* Cumplido. La pantalla de login ya no muestra credenciales demo.
 
-- [ ] **Issue #32 - Actualizar dependencias compatibles con Expo SDK actual**
+- [ ] **Tarea técnica - Actualizar dependencias compatibles con Expo SDK actual**
   - *Área:* Arquitectura y escalabilidad.
   - *Severidad:* Baja.
   - *Tipo:* Deuda técnica.
@@ -106,6 +106,13 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ---
 
 ## ✅ Tareas Completadas
+- [x] **Issue #1 - Gestión de empleados:** Altas, edición y bajas de personal implementadas en el panel de administración.
+- [x] **Issue #2 - Validar conflictos entre turnos asignados y vacaciones aprobadas:** Añadidas comprobaciones para evitar solapamientos en la planificación.
+- [x] **Issue #3 - Optimización de asignación de turnos mediante copia semanal o patrones:** Incorporadas mejoras para agilizar la planificación repetitiva.
+- [x] **Issue #4 - Autogestión del empleado para cancelar vacaciones y cambiar contraseña:** Flujo de autogestión habilitado para vacaciones y credenciales.
+- [x] **Issue #5 - Generar reportes mensuales de turnos por empleado:** Implementado el cálculo mensual y el resumen por trabajador.
+- [x] **Issue #6 - Migración de infraestructura local (SQLite) a Supabase Cloud:** Migración funcional completada y sincronización centralizada en Supabase.
+- [x] **Issue #7 - Corregir carga inicial de vacaciones y turnos en `CalendarScreen`:** Ajustado el flujo de carga para evitar estados inconsistentes al entrar en calendario.
 - [x] **Cierre de seguridad Auth / RLS (16/04):** Migración completa del login a Supabase Auth, persistencia de sesión con `AsyncStorage`, enlace de perfiles mediante `employees.auth_user_id`, creación segura de empleados mediante Edge Function `provision-employee`, eliminación del campo `password` en `employees` y definición de políticas RLS para `employees`, `shifts`, `vacations` y `attendances`.
 - [x] **Resumen breve de auditoría técnica Auth (16/04):**
   - *Hallazgos:* Existía autenticación custom contra `employees.password`, cambio/reset de contraseña desde cliente y acoplamiento entre credenciales y perfil.
@@ -115,13 +122,13 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 - [x] **Issue #23 - Limpieza de SQLite y Consolidación:** Eliminación del código legado (database.js), limpieza de App.js y desinstalación de la dependencia `expo-sqlite` para optimizar el proyecto tras la migración a Supabase.
 - [x] **Issue #21 - Finalización Exportación PDF y Restauración UI Premium (15/04):** Despliegue final de la lógica de generación de PDF, corrección de errores críticos de sintaxis JSX en `AdminScreen.js` y restauración de la estética Premium (Timeline y visualización dinámica) tras la limpieza de código legado.
 - [x] **BugFix - Sintaxis JSX y Layout en Admin (14/04):** Corrección de etiquetas `<View>` mal cerradas y refactorización de contenedores `flex: 1` para restaurar la visibilidad de la pestaña de Fichajes.
-- [x] **Issue #16 - Gestión de Vacaciones Aprobadas (Control Admin):** Botón para cancelar vacaciones aprobadas y devolver días automáticamente de forma segura.
+- [x] **Issue #14 - Gestión de Vacaciones Aprobadas (Control Admin):** Botón para cancelar vacaciones aprobadas y devolver días automáticamente de forma segura.
 - [x] **Issue #20 - Rediseño Premium del Monitor de Fichajes:** Implementada interfaz tipo Timeline con tarjetas, avatares dinámicos e indicadores de estado activo para el administrador.
-- [x] **Issue #17 - Monitor de Fichajes (Panel Admin):** Pestaña nueva con auditoría diaria del horario exacto de entrada y salida de los empleados.
-- [x] **Issue #12 - Plantillas Horarias:** Añadidos campos `start_time` y `end_time` a turnos. Edición manual y vista explícita.
-- [x] **Issue #13 - Registro de Jornada (Fichaje):** Botón de Entrada/Salida vinculado a Supabase.
+- [x] **Issue #19 - Monitor de Fichajes (Panel Admin):** Pestaña nueva con auditoría diaria del horario exacto de entrada y salida de los empleados.
+- [x] **Issue #12 - Plantillas Horarias y gestión de horas de entrada/salida:** Añadidos campos `start_time` y `end_time` a turnos, junto con el soporte funcional para la gestión de horas de entrada y salida.
+- [x] **Registro de Jornada (Fichaje):** Botón de Entrada/Salida vinculado a Supabase.
 - [x] **Issue #15 - Reseteo de Contraseñas (Admin):** Panel de reseteo temporal y flujo cautivo de cambio obligatorio. (Anteriormente citada como #17).
-- [x] **Issue #19 - Pantalla de Ajustes de Usuario (Settings):** Creada pantalla independiente con gestión de perfil, cambio de contraseña y cierre de sesión. Limpieza del `HomeScreen`.
+- [x] **Issue #17 - Pantalla de Ajustes de Usuario (Settings):** Creada pantalla independiente con gestión de perfil, cambio de contraseña y cierre de sesión. Limpieza del `HomeScreen`.
 - [x] **Issue #9 - Rediseño del Dashboard:** Pantalla de inicio minimalista con botones degradados (`expo-linear-gradient`).
 - [x] **Issue #10 - Navegación Premium:** Iconos con estados personalizados, indicadores de pestaña activa y botón de Vacaciones destacado en rojo.
 - [x] **BugFix - Espaciado en Tab Bar:** 
@@ -134,5 +141,5 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Incidencia:* El modal de asignación de turnos ("pincel") sólo guardaba el 'Día Seleccionado' en lugar de todas las fechas pintadas. Además, no mostraba visualmente los turnos que el empleado ya tenía configurados en la base de datos.
   - *Solución:* Se integró `getShiftsByEmployee` en el componente modal para precargar todo el historial del trabajador seleccionado como `dailyAssignments`. Se refactorizó la lógica en `handleAddShift` para grabar todos los cambios localizados en el `Set` `modifiedAssignmentDates`, resolviendo las inserciones desfasadas.
 - [x] **Issue #8:** Asignación masiva de turnos mediante calendario interactivo.
-- [x] **Issue #22:** Selector táctil de vacaciones para empleados. (Reenumerado para evitar colisión con Issue #20).
+- [x] **Issue #13:** Selector táctil de vacaciones para empleados.
 - [x] **Migración a Supabase:** Sincronización en tiempo real finalizada.
