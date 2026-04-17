@@ -27,39 +27,51 @@ LocaleConfig.locales['es'] = {
 };
 LocaleConfig.defaultLocale = 'es';
 
+function parseVacationDate(value) {
+  if (!value || typeof value !== 'string') return null;
+
+  const parsedDate = parseISO(value);
+  if (Number.isNaN(parsedDate.getTime())) return null;
+
+  parsedDate.setHours(0, 0, 0, 0);
+  return parsedDate;
+}
+
 export default function AdminRequestVacationScreen({ navigation, route }) {
   const { user, refreshUser } = useAuth();
   const employeeVacation = route?.params;
+  const originalStartDate = parseVacationDate(employeeVacation?.start_date);
+  const originalEndDate = parseVacationDate(employeeVacation?.end_date);
+  const originalAvailableDays = employeeVacation?.employees?.available_days ?? 0;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [startDate, setStartDate] = useState(
-    employeeVacation?.start_date
-      ? new Date(employeeVacation.start_date)
-      : null
-  );
-
-  const [endDate, setEndDate] = useState(
-    employeeVacation?.end_date
-      ? new Date(employeeVacation.end_date)
-      : null
-  );
-
-
-  const newAvailableDays = differenceInCalendarDays((employeeVacation?.end_date), (employeeVacation?.start_date)) + 1 + employeeVacation?.employees.available_days;
+  const [startDate, setStartDate] = useState(originalStartDate);
+  const [endDate, setEndDate] = useState(originalEndDate);
 
   const [loading, setLoading] = useState(false);
 
   // Consideramos las vacaciones desde startDate hasta endDate incluídos
   const effectiveEnd = endDate || startDate;
-  const days = startDate ? differenceInCalendarDays(effectiveEnd, startDate) + 1 : 0;
+  const hasValidRange = Boolean(startDate && effectiveEnd && effectiveEnd >= startDate);
+  const days = hasValidRange ? differenceInCalendarDays(effectiveEnd, startDate) + 1 : 0;
+  const originalDays =
+    originalStartDate && originalEndDate && originalEndDate >= originalStartDate
+      ? differenceInCalendarDays(originalEndDate, originalStartDate) + 1
+      : 0;
+  const newAvailableDays = originalAvailableDays + originalDays;
   // Solo se puede tramitar si hay al menos un día válido seleccionado, y entra en el saldo.
-  const canRequest = days > 0 && effectiveEnd >= startDate && days <= (newAvailableDays ?? 0) && startDate >= today;
+  const canRequest =
+    days > 0 &&
+    hasValidRange &&
+    days <= newAvailableDays &&
+    startDate >= today;
 
   const canRequestIfDatesAreEqual =
-    format(startDate, 'yyyy-MM-dd') === employeeVacation?.start_date &&
-    format(endDate, 'yyyy-MM-dd') === employeeVacation?.end_date;
+    Boolean(startDate && effectiveEnd && employeeVacation?.start_date && employeeVacation?.end_date) &&
+    format(startDate, 'yyyy-MM-dd') === employeeVacation.start_date &&
+    format(effectiveEnd, 'yyyy-MM-dd') === employeeVacation.end_date;
 
   const onDayPress = (day) => {
     const date = parseISO(day.dateString);
@@ -142,17 +154,25 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
       <View style={styles.summary}>
         <View style={styles.summaryDetails}>
           <MaterialCommunityIcons name="account" size={25} color={colors.textSecondary} />
-          <Text style={styles.summaryText}>{employeeVacation.employees.name}</Text>
+          <Text style={styles.summaryText}>{employeeVacation?.employees?.name ?? 'Empleado'}</Text>
         </View>
         <View style={styles.summaryDetails}>
           <View style={{ flexDirection: 'row', justifyContent: 'center', backgroundColor: colors.white, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, gap: 8 }}>
-            <Text style={{ fontSize: 12, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
-              {format(employeeVacation?.start_date, "d MMM", { locale: es })}
-            </Text>
-            <MaterialCommunityIcons name="arrow-right" size={16} color={colors.textMuted} />
-            <Text style={{ fontSize: 12, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
-              {format(employeeVacation?.end_date, "d MMM yyyy", { locale: es })}
-            </Text>
+            {originalStartDate && originalEndDate ? (
+              <>
+                <Text style={{ fontSize: 12, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
+                  {format(originalStartDate, "d MMM", { locale: es })}
+                </Text>
+                <MaterialCommunityIcons name="arrow-right" size={16} color={colors.textMuted} />
+                <Text style={{ fontSize: 12, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
+                  {format(originalEndDate, "d MMM yyyy", { locale: es })}
+                </Text>
+              </>
+            ) : (
+              <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: typography.weights.bold }}>
+                Fechas no disponibles
+              </Text>
+            )}
           </View>
         </View>
       </View>
@@ -165,7 +185,7 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryNumber, days > (newAvailableDays ?? 0) && styles.summaryNumberDanger]}>
-            {(newAvailableDays ?? 0) - (canRequest ? days : 0)}
+            {newAvailableDays - (canRequest ? days : 0)}
           </Text>
           <Text style={styles.summaryLabel}>Quedarían disponibles</Text>
         </View>
@@ -199,10 +219,12 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
         />
         {(startDate || endDate) && (
           <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 12, backgroundColor: colors.white, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
-            <Text style={{ fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
-              {format(startDate, "d MMM", { locale: es })}
-            </Text>
-            {startDate && endDate && startDate !== endDate && (
+            {startDate ? (
+              <Text style={{ fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
+                {format(startDate, "d MMM", { locale: es })}
+              </Text>
+            ) : null}
+            {startDate && endDate && startDate.getTime() !== endDate.getTime() && (
               <>
                 <MaterialCommunityIcons name="arrow-right" size={16} color={colors.textMuted} style={{ marginHorizontal: 12 }} />
                 <Text style={{ fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold }}>
@@ -215,7 +237,7 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
       </View>
 
       {/* Warning if not enough days */}
-      {days > (newAvailableDays) && (
+      {days > newAvailableDays && (
         <View style={styles.warningBox}>
           <MaterialCommunityIcons name="alert" size={16} color={colors.rejected} />
           <Text style={styles.warningText}>
