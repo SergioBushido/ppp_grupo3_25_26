@@ -90,7 +90,7 @@ Tras analizar los estándares de UX en herramientas profesionales de productivid
 - **Contexto Visual:** Otorga un *feedback* inmediato al administrador sobre qué porción del mes está a punto de modificar.
 - **Seguridad (Validación Cruzada):** Sumado a esta nueva interfaz, el sistema evalúa los días seleccionados y **omite automáticamente** la creación de turnos si detecta que la fecha elegida colisiona con unas vacaciones previamente aprobadas en Supabase, asegurando la integridad de los horarios de la empresa.
 
-### 📅 Issue #15: Selector de Vacaciones Interactivo para Empleados
+### 📅 Issue #13: Selector de Vacaciones Interactivo para Empleados
 
 **Problema Identificado:**  
 El sistema original de solicitud de vacaciones para empleados utilizaba selectores de fecha basados en botones de incremento/decremento (+/-). Aunque funcional, esta aproximación resultaba deficiente por varias razones:
