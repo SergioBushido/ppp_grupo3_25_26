@@ -29,14 +29,14 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción aplicada:* Sustituida la autenticación custom por `supabase.auth`, eliminadas consultas por password en cliente, enlazado el perfil por `auth_user_id` y eliminada la columna `password` de `employees`.
   - *Criterio de aceptación:* Cumplido. No existe ninguna comparación/lectura de `password` en cliente; login, logout y cambio de contraseña funcionan con Supabase Auth y sesión persistente.
 
-- [ ] **Issue #31 - Corregir bug de fechas en edición admin de vacaciones**
+- [x] **Issue #31 - Corregir bug de fechas en edición admin de vacaciones**
   - *Área:* Bugs y errores.
   - *Severidad:* Alta.
   - *Tipo:* Bug confirmado.
   - *Impacto:* Posibles errores de ejecución y cálculos incorrectos al editar solicitudes desde Admin.
   - *Módulos afectados:* `src/screens/AdminRequestVacationScreen.js`.
-  - *Acción recomendada:* Normalizar entradas con `parseISO` antes de usar `differenceInCalendarDays` y `format`, validando nulos.
-  - *Criterio de aceptación:* La pantalla de edición no falla y calcula correctamente días solicitados/disponibles en todos los escenarios.
+  - *Acción aplicada:* Normalizadas las fechas de entrada con parseo seguro y validación de nulos, unificadas las comparaciones de rango usando valores ya parseados y ajustado el calendario para editar solicitudes existentes sin romper el flujo por fechas inválidas o anteriores.
+  - *Criterio de aceptación:* Cumplido. La pantalla de edición ya no falla por parseo inconsistente y calcula correctamente días solicitados/disponibles en los escenarios contemplados.
 
 - [x] **Bugfix interno - Corregir lógica de validación y mensajes en `editRequestVacation`**
   - *Área:* Bugs y errores.
