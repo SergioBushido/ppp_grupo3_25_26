@@ -3,14 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { format, addDays, differenceInCalendarDays, parseISO } from 'date-fns';
+import { format, addDays, differenceInCalendarDays, isValid, parseISO, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { useAuth } from '../context/AuthContext';
@@ -28,24 +27,36 @@ LocaleConfig.locales['es'] = {
 LocaleConfig.defaultLocale = 'es';
 
 function parseVacationDate(value) {
-  if (!value || typeof value !== 'string') return null;
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    return isValid(value) ? startOfDay(new Date(value)) : null;
+  }
+
+  if (typeof value !== 'string') return null;
 
   const parsedDate = parseISO(value);
-  if (Number.isNaN(parsedDate.getTime())) return null;
+  if (!isValid(parsedDate)) return null;
 
-  parsedDate.setHours(0, 0, 0, 0);
-  return parsedDate;
+  return startOfDay(parsedDate);
+}
+
+function formatVacationDate(value) {
+  return value ? format(value, 'yyyy-MM-dd') : null;
 }
 
 export default function AdminRequestVacationScreen({ navigation, route }) {
-  const { user, refreshUser } = useAuth();
+  const { refreshUser } = useAuth();
   const employeeVacation = route?.params;
   const originalStartDate = parseVacationDate(employeeVacation?.start_date);
   const originalEndDate = parseVacationDate(employeeVacation?.end_date);
+  const originalStartDateKey = formatVacationDate(originalStartDate);
+  const originalEndDateKey = formatVacationDate(originalEndDate);
   const originalAvailableDays = employeeVacation?.employees?.available_days ?? 0;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = startOfDay(new Date());
+  const minSelectableDate =
+    originalStartDate && originalStartDate < today ? originalStartDate : today;
 
   const [startDate, setStartDate] = useState(originalStartDate);
   const [endDate, setEndDate] = useState(originalEndDate);
@@ -66,19 +77,19 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
     days > 0 &&
     hasValidRange &&
     days <= newAvailableDays &&
-    startDate >= today;
+    startDate >= minSelectableDate;
 
   const canRequestIfDatesAreEqual =
-    Boolean(startDate && effectiveEnd && employeeVacation?.start_date && employeeVacation?.end_date) &&
-    format(startDate, 'yyyy-MM-dd') === employeeVacation.start_date &&
-    format(effectiveEnd, 'yyyy-MM-dd') === employeeVacation.end_date;
+    Boolean(startDate && effectiveEnd && originalStartDateKey && originalEndDateKey) &&
+    formatVacationDate(startDate) === originalStartDateKey &&
+    formatVacationDate(effectiveEnd) === originalEndDateKey;
 
   const onDayPress = (day) => {
-    const date = parseISO(day.dateString);
-    date.setHours(0, 0, 0, 0);
+    const date = parseVacationDate(day.dateString);
+    if (!date) return;
 
     // Evitar peticiones en fechas del pasado
-    if (date < today) return;
+    if (date < minSelectableDate) return;
 
     if (!startDate || (startDate && endDate)) {
       // Si no hay nada, o si ya había un rango completo definido, reiniciamos el inicio
@@ -129,8 +140,8 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
       await editRequestVacation({
         vacation_id: employeeVacation?.id,
         employee_id: employeeVacation?.employee_id,
-        start_date: format(startDate, 'yyyy-MM-dd'),
-        end_date: format(effectiveEnd, 'yyyy-MM-dd'),
+        start_date: formatVacationDate(startDate),
+        end_date: formatVacationDate(effectiveEnd),
         available_days: newAvailableDays
       });
 
@@ -200,13 +211,13 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Seleccionar Período</Text>
         <Text style={{ fontSize: typography.sizes.xs, color: colors.textSecondary, marginBottom: 8 }}>
-          Toca en la cuadrícula el primer día y luego el último día de tus vacaciones. Si tocas un solo día dos veces, será de un día. Solo se permiten fechas futuras.
+          Toca en la cuadrícula el primer día y luego el último día de las vacaciones. Si tocas un solo día dos veces, será una solicitud de un día.
         </Text>
         <Calendar
           markingType={'period'}
           markedDates={markedDatesForCalendar}
           onDayPress={onDayPress}
-          minDate={format(today, 'yyyy-MM-dd')}
+          minDate={formatVacationDate(minSelectableDate)}
           firstDay={1}
           theme={{
             todayTextColor: colors.primary,
