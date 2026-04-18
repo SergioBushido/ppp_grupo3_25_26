@@ -47,14 +47,15 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción aplicada:* Corregida la variable `days` no definida en mensajes y corregido el retorno inválido de `editRequestVacation`.
   - *Criterio de aceptación:* Cumplido parcialmente. Los mensajes y el retorno ya son coherentes; queda recomendable revisar a futuro la regla de negocio completa del saldo en escenarios complejos.
 
-- [ ] **Issue #30 - Hacer transaccional la aprobación/cancelación de vacaciones**
+- [x] **Issue #30 - Hacer transaccional la aprobación/cancelación de vacaciones**
   - *Área:* Arquitectura y escalabilidad.
   - *Severidad:* Alta.
   - *Tipo:* Riesgo potencial.
   - *Impacto:* Inconsistencias de datos si una operación parcial actualiza `vacations` pero no `employees.available_days` (o viceversa).
-  - *Módulos afectados:* `src/database/vacationService.js` y funciones SQL/RPC de Supabase.
-  - *Acción recomendada:* Encapsular cada operación en una única transacción SQL/RPC idempotente.
-  - *Criterio de aceptación:* Cada cambio de estado deja datos consistentes incluso ante fallos intermedios o reintentos.
+  - *Módulos afectados:* `src/database/vacationService.js` y `supabase/migrations/20260418103200_issue_30_transactional_vacations.sql`.
+  - *Problemas encontrados:* La app seguía aprobando/cancelando vacaciones con dos escrituras separadas y podía dejar datos inconsistentes. Durante el despliegue en Supabase SQL Editor apareció además un falso positivo de RLS sobre `vacation_record` y un error `42P01 relation "vacation_record" does not exist` al ejecutar bloques parciales o interpretar de forma problemática `%rowtype`.
+  - *Solución aplicada:* Se movió la lógica crítica a las RPCs `approve_vacation_transactional` y `cancel_vacation_transactional` con bloqueo `FOR UPDATE`, validación de estado y actualización atómica de vacaciones y saldo. Para evitar problemas del editor de Supabase, la migración quedó usando el tipo compuesto `public.vacations` en lugar de `%rowtype`, y se documentó su ejecución completa en el SQL Editor.
+  - *Criterio de aceptación:* Cumplido. Aprobación y cancelación se ejecutan ya desde RPC transaccional y la migración quedó aplicada en Supabase sin errores.
 
 #### 🟠 Importante (Siguiente iteración)
 - [x] **Issue #28 - Implementar sesión persistente real en AuthContext**
@@ -65,6 +66,41 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Módulos afectados:* `src/context/AuthContext.js`, `src/navigation/AppNavigator.js`.
   - *Acción aplicada:* Inicialización de sesión con `getSession`, suscripción a `onAuthStateChange`, persistencia mediante `AsyncStorage` y desacoplamiento entre sesión Auth y perfil de empleado.
   - *Criterio de aceptación:* Cumplido. El usuario autenticado mantiene sesión tras reiniciar app y la navegación se hidrata correctamente.
+
+- [ ] **Issue nueva - Permitir a cada usuario subir y cambiar su foto de perfil**
+  - *Área:* Experiencia de usuario.
+  - *Severidad:* Media.
+  - *Tipo:* Nueva funcionalidad.
+  - *Impacto:* Mejora la identificación visual del empleado en ajustes, fichajes, panel admin y futuras vistas con avatar persistente.
+  - *Objetivo:* Que cada usuario pueda seleccionar, subir, reemplazar y visualizar su imagen de perfil de forma segura desde la app.
+  - *Módulos afectados:* `src/screens/SettingsScreen.js`, `src/context/AuthContext.js`, componentes con avatar (`AdminScreen`, monitor de fichajes, futuras tarjetas de perfil), Storage y SQL de Supabase.
+  - *Propuesta técnica:* Añadir campo `avatar_url` en `employees`, crear bucket privado o controlado en Supabase Storage, subir imágenes redimensionadas desde la app, guardar la URL pública o firmada en el perfil y refrescar el contexto de usuario tras cada cambio.
+  - *Plan de implementación:*
+    1. Crear migración SQL para añadir `avatar_url` en `employees` y revisar políticas RLS relacionadas con lectura/actualización del perfil.
+    2. Configurar bucket de Supabase Storage y definir reglas de acceso para que cada empleado solo pueda gestionar su propia foto.
+    3. Implementar servicio cliente para elegir imagen, validar tipo/tamaño, subirla a Storage y persistir la referencia en `employees`.
+    4. Añadir UI en `SettingsScreen` para previsualizar, cambiar y eliminar la foto de perfil, con estados de carga y error.
+    5. Sustituir iniciales por avatar real en pantallas donde ya se muestran usuarios, manteniendo fallback visual cuando no haya imagen.
+    6. Validar manualmente subida inicial, reemplazo, persistencia tras reinicio y comportamiento ante fallo de red o imagen inválida.
+  - *Criterios de aceptación:* El usuario autenticado puede actualizar su foto desde ajustes, la imagen persiste tras reiniciar sesión, se refleja en las vistas principales con fallback correcto y no permite modificar imágenes de otros usuarios.
+
+- [ ] **Issue nueva - Configurar fichaje por geolocalización flexible por empleado**
+  - *Área:* Operativa y control horario.
+  - *Severidad:* Media.
+  - *Tipo:* Nueva funcionalidad.
+  - *Impacto:* Permite adaptar el fichaje a la realidad de cada trabajador, diferenciando entre personal móvil y personal que debe registrar entrada/salida desde un centro concreto.
+  - *Objetivo:* Que el administrador pueda decidir por empleado si el fichaje se valida en cualquier ubicación o solo dentro del radio de un centro de trabajo asignado.
+  - *Módulos afectados:* `src/screens/AdminScreen.js`, flujo de edición de empleados, `src/database/employeeService.js`, `src/database/attendanceService.js`, pantalla de fichaje/Home, permisos de ubicación en Expo y SQL de Supabase.
+  - *Propuesta técnica:* Añadir configuración de política de fichaje en `employees` (`anywhere`, `assigned_center`, opcionalmente `manual_only`), tabla `work_centers` con latitud/longitud/radio, almacenamiento de coordenadas y precisión en `attendances`, y validación previa al fichaje según la política del empleado.
+  - *Plan de implementación:*
+    1. Crear migraciones SQL para `work_centers`, relación opcional con `employees`, campos de política de fichaje y columnas de geolocalización/precisión en `attendances`.
+    2. Definir políticas RLS y consultas para que el admin gestione centros y configuración, y cada empleado solo consuma lo necesario para validar su fichaje.
+    3. Implementar en la app la lectura de ubicación con permisos explícitos, timeout controlado y captura de precisión usando `expo-location`.
+    4. Añadir en administración la configuración por empleado del modo de fichaje y, si aplica, el centro de trabajo asignado con radio editable.
+    5. Validar en el flujo de fichaje si el usuario puede registrar desde cualquier sitio o si debe estar dentro del radio permitido, mostrando mensajes claros de dentro/fuera de zona.
+    6. Guardar en cada fichaje la evidencia mínima de ubicación (latitud, longitud, precisión, centro validado o motivo de exención) para futuras auditorías.
+    7. Probar manualmente escenarios de empleado móvil, empleado con centro asignado, GPS impreciso, permisos denegados y fichaje fuera de zona.
+  - *Criterios de aceptación:* El admin puede configurar el modo de fichaje por empleado, la app valida correctamente la ubicación cuando procede, permite fichar libremente a empleados móviles y deja trazabilidad suficiente para auditoría.
 
 - [ ] **Tarea técnica - Estandarizar manejo de errores y reintento en cargas de pantallas**
   - *Área:* Bugs y errores.

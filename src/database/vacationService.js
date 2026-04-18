@@ -137,39 +137,12 @@ export async function editRequestVacation({ vacation_id, employee_id, start_date
 }
 
 export async function approveVacation(vacationId) {
-  // Obtener detalles de la vacación
-  const { data: vacation, error: vError } = await supabase
-    .from('vacations')
-    .select('*')
-    .eq('id', vacationId)
-    .single();
-
-  if (vError || !vacation) throw new Error('Solicitud no encontrada');
-
-  const days = differenceInCalendarDays(parseISO(vacation.end_date), parseISO(vacation.start_date)) + 1;
-
-  // Actualizar estado de la vacación
-  const { error: updateVError } = await supabase
-    .from('vacations')
-    .update({ 
-      status: 'approved', 
-      reviewed_at: new Date().toISOString() 
-    })
-    .eq('id', vacationId);
-
-  if (updateVError) throw updateVError;
-
-  // Restar días al empleado
-  const { error: updateEmpError } = await supabase.rpc('decrement_available_days', {
-    emp_id: vacation.employee_id,
-    days_to_subtract: days
+  const { data, error } = await supabase.rpc('approve_vacation_transactional', {
+    p_vacation_id: vacationId,
   });
 
-  // Si el RPC falla (porque quizás no está creado), intentamos actualización manual
-  if (updateEmpError) {
-    const { data: empData } = await supabase.from('employees').select('available_days').eq('id', vacation.employee_id).single();
-    await supabase.from('employees').update({ available_days: empData.available_days - days }).eq('id', vacation.employee_id);
-  }
+  if (error) throw error;
+  return data;
 }
 
 
@@ -189,36 +162,13 @@ export async function rejectVacation(vacationId) {
 
 // Cancelar la vacacion cuando esta aprobada
 export async function cancelVacation(vacation) {
+  const vacationId = typeof vacation === 'object' ? vacation?.id : vacation;
+  const { data, error } = await supabase.rpc('cancel_vacation_transactional', {
+    p_vacation_id: vacationId,
+  });
 
-  const days = differenceInCalendarDays(parseISO(vacation.end_date), parseISO(vacation.start_date)) + 1;
-
-  const { error: vacationError } = await supabase
-    .from('vacations')
-    .update({ 
-      status: 'pending', 
-      reviewed_at: new Date().toISOString() 
-    })
-    .eq('id', vacation.id);
-  
-  if (vacationError) throw vacationError;
-
-  // Obtener los días actuales del empleado
-  const { data: empData, error: fetchEmpError } = await supabase
-    .from('employees')
-    .select('available_days')
-    .eq('id', vacation.employee_id)
-    .single();
-
-  if (fetchEmpError) throw fetchEmpError;
-
-  const { error: employeeError } = await supabase
-    .from('employees')
-    .update({ 
-      available_days: empData.available_days + days, 
-    })
-    .eq('id', vacation.employee_id);
-  
-  if (employeeError) throw employeeError;
+  if (error) throw error;
+  return data;
 }
 
 // Reactivar la vacación cuando esta rechazada (rejected)
