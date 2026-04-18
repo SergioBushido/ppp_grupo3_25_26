@@ -25,6 +25,13 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": []
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "TransferLog necesita acceso a tu galeria para que puedas actualizar tu foto de perfil."
+        }
+      ]
+    ]
   }
 }
