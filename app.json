@@ -13,14 +13,21 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "TransferLog necesita tu ubicacion para validar el fichaje cuando tu politica requiera estar dentro del radio de un centro."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,6 +37,12 @@
         "expo-image-picker",
         {
           "photosPermission": "TransferLog necesita acceso a tu galeria para que puedas actualizar tu foto de perfil."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "TransferLog necesita tu ubicacion para validar el fichaje cuando tu politica requiera estar dentro del radio de un centro."
         }
       ]
     ]

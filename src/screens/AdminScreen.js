@@ -12,6 +12,7 @@ import {
   TextInput,
   ScrollView,
   Animated,
+  Linking,
 } from 'react-native';
 
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -32,6 +33,7 @@ import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacation
 import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee, resetEmployeePassword } from '../database/employeeService';
 import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts, updateShift, getShiftsByEmployee } from '../database/shiftService';
 import { getAllAttendancesByDate } from '../database/attendanceService';
+import { createWorkCenter, deleteWorkCenter, getAllWorkCenters, updateWorkCenter } from '../database/workCenterService';
 import { VacationCard } from '../components/VacationCard';
 import { ShiftBadge } from '../components/ShiftBadge';
 import UserAvatar from '../components/UserAvatar';
@@ -53,11 +55,18 @@ const SHIFT_OPTIONS = [
   { type: 'night', label: 'Noche', icon: 'weather-night' },
 ];
 
+const ATTENDANCE_POLICIES = [
+  { value: 'anywhere', label: 'Libre', description: 'Puede fichar desde cualquier ubicacion.' },
+  { value: 'assigned_center', label: 'Centro asignado', description: 'Debe estar dentro del radio del centro configurado.' },
+  { value: 'manual_only', label: 'Solo manual', description: 'El fichaje no se registra desde la app.' },
+];
+
 export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState('requests');
   const [pendingVacations, setPendingVacations] = useState([]);
   const [allVacations, setAllVacations] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [workCenters, setWorkCenters] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Shifts management
@@ -72,6 +81,8 @@ export default function AdminScreen() {
   // Attendances monitoring
   const [attendanceDate, setAttendanceDate] = useState(new Date());
   const [dayAttendances, setDayAttendances] = useState([]);
+  const [selectedAttendanceLocation, setSelectedAttendanceLocation] = useState(null);
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [activeBrush, setActiveBrush] = useState('morning');
   const [copyModalVisible, setCopyModalVisible] = useState(false);
   const [copySummary, setCopySummary] = useState({ shifts: [], conflicts: [], sourceRange: '', targetRange: '' });
@@ -131,7 +142,17 @@ export default function AdminScreen() {
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editDays, setEditDays] = useState('');
+  const [editAttendancePolicy, setEditAttendancePolicy] = useState('anywhere');
+  const [editAssignedCenterId, setEditAssignedCenterId] = useState(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
+
+  const [workCenterModalVisible, setWorkCenterModalVisible] = useState(false);
+  const [editingWorkCenter, setEditingWorkCenter] = useState(null);
+  const [centerName, setCenterName] = useState('');
+  const [centerAddress, setCenterAddress] = useState('');
+  const [centerLatitude, setCenterLatitude] = useState('');
+  const [centerLongitude, setCenterLongitude] = useState('');
+  const [centerRadius, setCenterRadius] = useState('150');
 
   // Add employee modal
   const [addEmpModalVisible, setAddEmpModalVisible] = useState(false);
@@ -222,20 +243,61 @@ export default function AdminScreen() {
     });
   }, [dayAttendances, attendanceFilter]);
 
+  const getWorkCenterName = useCallback((centerId) => {
+    if (!centerId) return null;
+    return workCenters.find((center) => center.id === centerId)?.name || null;
+  }, [workCenters]);
+
+  const hasAttendanceCoordinates = useCallback((attendance) => (
+    attendance?.latitude != null && attendance?.longitude != null
+  ), []);
+
+  const handleShowAttendanceLocation = useCallback((attendance) => {
+    if (!hasAttendanceCoordinates(attendance)) {
+      Alert.alert('Ubicacion no disponible', 'Este fichaje no tiene coordenadas guardadas.');
+      return;
+    }
+
+    setSelectedAttendanceLocation(attendance);
+    setLocationModalVisible(true);
+  }, [hasAttendanceCoordinates]);
+
+  const handleOpenAttendanceLocationInMaps = useCallback(async () => {
+    if (!selectedAttendanceLocation || !hasAttendanceCoordinates(selectedAttendanceLocation)) {
+      return;
+    }
+
+    const url = `https://www.google.com/maps/search/?api=1&query=${selectedAttendanceLocation.latitude},${selectedAttendanceLocation.longitude}`;
+
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        Alert.alert('No disponible', 'No se pudo abrir la ubicacion en la aplicacion de mapas.');
+        return;
+      }
+
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo abrir la ubicacion en mapas.');
+    }
+  }, [selectedAttendanceLocation, hasAttendanceCoordinates]);
+
   
 
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [pending, all, emps] = await Promise.all([
+      const [pending, all, emps, centers] = await Promise.all([
         getAllPendingVacations(),
         getAllVacations(),
         getAllEmployees(),
+        getAllWorkCenters(),
       ]);
       setPendingVacations(pending);
       setAllVacations(all);
       setEmployees(emps.filter((e) => e.role === 'employee'));
+      setWorkCenters(centers);
     } catch (e) {
       console.error("Error loading Admin data:", e);
       Alert.alert("Error", "No se pudieron cargar los datos del panel.");
@@ -665,6 +727,8 @@ export default function AdminScreen() {
     setEditName(emp.name);
     setEditEmail(emp.email);
     setEditDays(String(emp.available_days));
+    setEditAttendancePolicy(emp.attendance_policy || 'anywhere');
+    setEditAssignedCenterId(emp.assigned_work_center_id || null);
     setEditModalVisible(true);
   };
 
@@ -675,17 +739,112 @@ export default function AdminScreen() {
       return;
     }
 
+    if (editAttendancePolicy === 'assigned_center' && !editAssignedCenterId) {
+      Alert.alert('Error', 'Debes asignar un centro de trabajo para esta politica de fichaje.');
+      return;
+    }
+
     try {
       await updateEmployee(editingEmployee.id, {
         name: editName,
         email: editEmail,
-        available_days: daysNum
+        available_days: daysNum,
+        attendance_policy: editAttendancePolicy,
+        assigned_work_center_id: editAttendancePolicy === 'assigned_center' ? editAssignedCenterId : null,
       });
       await loadAll();
       setEditModalVisible(false);
     } catch (e) {
       Alert.alert('Error', 'No se pudo actualizar el empleado.');
     }
+  };
+
+  const resetWorkCenterForm = () => {
+    setEditingWorkCenter(null);
+    setCenterName('');
+    setCenterAddress('');
+    setCenterLatitude('');
+    setCenterLongitude('');
+    setCenterRadius('150');
+  };
+
+  const openCreateWorkCenterModal = () => {
+    resetWorkCenterForm();
+    setWorkCenterModalVisible(true);
+  };
+
+  const openEditWorkCenterModal = (center) => {
+    setEditingWorkCenter(center);
+    setCenterName(center.name || '');
+    setCenterAddress(center.address || '');
+    setCenterLatitude(String(center.latitude ?? ''));
+    setCenterLongitude(String(center.longitude ?? ''));
+    setCenterRadius(String(center.radius_meters ?? '150'));
+    setWorkCenterModalVisible(true);
+  };
+
+  const handleSaveWorkCenter = async () => {
+    const latitude = parseFloat(centerLatitude);
+    const longitude = parseFloat(centerLongitude);
+    const radius = parseFloat(centerRadius);
+
+    if (!centerName.trim()) {
+      Alert.alert('Error', 'Debes indicar un nombre para el centro.');
+      return;
+    }
+
+    if ([latitude, longitude, radius].some((value) => Number.isNaN(value))) {
+      Alert.alert('Error', 'Latitud, longitud y radio deben ser valores numericos validos.');
+      return;
+    }
+
+    try {
+      if (editingWorkCenter?.id) {
+        await updateWorkCenter(editingWorkCenter.id, {
+          name: centerName,
+          address: centerAddress,
+          latitude,
+          longitude,
+          radius_meters: radius,
+        });
+      } else {
+        await createWorkCenter({
+          name: centerName,
+          address: centerAddress,
+          latitude,
+          longitude,
+          radius_meters: radius,
+        });
+      }
+
+      await loadAll();
+      setWorkCenterModalVisible(false);
+      resetWorkCenterForm();
+    } catch (error) {
+      Alert.alert('Error', error.message || 'No se pudo guardar el centro de trabajo.');
+    }
+  };
+
+  const handleDeleteWorkCenter = async (center) => {
+    Alert.alert(
+      'Eliminar centro',
+      `¿Seguro que quieres eliminar "${center.name}"? Los empleados asignados perderan la referencia al centro.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteWorkCenter(center.id);
+              await loadAll();
+            } catch (error) {
+              Alert.alert('Error', error.message || 'No se pudo eliminar el centro.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDeleteEmployee = async () => {
@@ -954,6 +1113,24 @@ export default function AdminScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontWeight: typography.weights.bold }}>{item.employee_name}</Text>
                         <Text style={{ color: colors.textMuted }}>{format(parseISO(item.timestamp), "HH:mm:ss")}</Text>
+                        {item.location_status && item.location_status !== 'not_required' && (
+                          <Text style={styles.attendanceGeoText}>
+                            {item.location_status === 'validated_center'
+                              ? `Centro validado${item.location_note ? ` · ${item.location_note}` : ''}${item.location_distance_meters ? ` · ${Math.round(Number(item.location_distance_meters))} m` : ''}`
+                              : item.location_status === 'optional_captured'
+                                ? 'Ubicacion capturada'
+                                : 'Ubicacion no disponible'}
+                          </Text>
+                        )}
+                        {hasAttendanceCoordinates(item) && (
+                          <TouchableOpacity
+                            style={styles.locationLinkBtn}
+                            onPress={() => handleShowAttendanceLocation(item)}
+                          >
+                            <MaterialCommunityIcons name="map-marker-radius-outline" size={16} color={colors.primary} />
+                            <Text style={styles.locationLinkText}>Mostrar ubicacion</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text style={{ color: item.type === 'in' ? colors.morning : colors.night, fontWeight: 'bold' }}>{item.type === 'in' ? 'Entrada' : 'Salida'}</Text>
@@ -964,6 +1141,75 @@ export default function AdminScreen() {
               )}
             </View>
           )}
+
+          <Modal
+            transparent
+            visible={locationModalVisible}
+            animationType="fade"
+            onRequestClose={() => setLocationModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modal}>
+                <Text style={styles.modalTitle}>Ubicacion del fichaje</Text>
+                <Text style={styles.modalSubtitle}>
+                  {selectedAttendanceLocation?.employee_name || 'Empleado'} · {selectedAttendanceLocation?.type === 'in' ? 'Entrada' : 'Salida'}
+                </Text>
+
+                <View style={styles.locationInfoCard}>
+                  <Text style={styles.locationInfoLabel}>Coordenadas</Text>
+                  <Text style={styles.locationInfoValue}>
+                    {selectedAttendanceLocation?.latitude != null && selectedAttendanceLocation?.longitude != null
+                      ? `${Number(selectedAttendanceLocation.latitude).toFixed(6)}, ${Number(selectedAttendanceLocation.longitude).toFixed(6)}`
+                      : 'No disponibles'}
+                  </Text>
+                </View>
+
+                <View style={styles.locationInfoCard}>
+                  <Text style={styles.locationInfoLabel}>Precision GPS</Text>
+                  <Text style={styles.locationInfoValue}>
+                    {selectedAttendanceLocation?.accuracy_meters != null
+                      ? `${Math.round(Number(selectedAttendanceLocation.accuracy_meters))} m`
+                      : 'No disponible'}
+                  </Text>
+                </View>
+
+                <View style={styles.locationInfoCard}>
+                  <Text style={styles.locationInfoLabel}>Estado</Text>
+                  <Text style={styles.locationInfoValue}>
+                    {selectedAttendanceLocation?.location_status === 'validated_center'
+                      ? `Centro validado${selectedAttendanceLocation?.location_note ? ` · ${selectedAttendanceLocation.location_note}` : ''}`
+                      : selectedAttendanceLocation?.location_status === 'optional_captured'
+                        ? 'Ubicacion registrada en modo libre'
+                        : 'Ubicacion no disponible'}
+                  </Text>
+                </View>
+
+                {selectedAttendanceLocation?.location_distance_meters != null && (
+                  <View style={styles.locationInfoCard}>
+                    <Text style={styles.locationInfoLabel}>Distancia al centro</Text>
+                    <Text style={styles.locationInfoValue}>
+                      {Math.round(Number(selectedAttendanceLocation.location_distance_meters))} m
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.modalCancelBtn}
+                    onPress={() => setLocationModalVisible(false)}
+                  >
+                    <Text style={styles.modalCancelText}>Cerrar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalConfirmBtn}
+                    onPress={handleOpenAttendanceLocationInMaps}
+                  >
+                    <Text style={styles.modalConfirmText}>Abrir en Maps</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
 
         
           {/* Employees Tab */}
@@ -984,6 +1230,13 @@ export default function AdminScreen() {
                     <View style={styles.empInfo}>
                       <Text style={styles.empName}>{item.name}</Text>
                       <Text style={styles.empEmail}>{item.email}</Text>
+                      <Text style={styles.empMeta}>
+                        {item.attendance_policy === 'assigned_center'
+                          ? `Fichaje por centro${getWorkCenterName(item.assigned_work_center_id) ? ` · ${getWorkCenterName(item.assigned_work_center_id)}` : ''}`
+                          : item.attendance_policy === 'manual_only'
+                            ? 'Fichaje solo manual'
+                            : 'Fichaje libre'}
+                      </Text>
                     </View>
                     <TouchableOpacity
                       style={styles.daysChip}
@@ -996,13 +1249,44 @@ export default function AdminScreen() {
                   </View>
                 )}
                 ListFooterComponent={
-                  <TouchableOpacity
-                    style={styles.addShiftBtn}
-                    onPress={() => setAddEmpModalVisible(true)}
-                  >
-                    <MaterialCommunityIcons name="account-plus" size={18} color={colors.white} />
-                    <Text style={styles.addShiftBtnText}>Añadir nuevo empleado</Text>
-                  </TouchableOpacity>
+                  <View style={{ gap: 10 }}>
+                    <TouchableOpacity
+                      style={styles.addShiftBtn}
+                      onPress={() => setAddEmpModalVisible(true)}
+                    >
+                      <MaterialCommunityIcons name="account-plus" size={18} color={colors.white} />
+                      <Text style={styles.addShiftBtnText}>Añadir nuevo empleado</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.addShiftBtn, styles.secondaryActionBtn]}
+                      onPress={openCreateWorkCenterModal}
+                    >
+                      <MaterialCommunityIcons name="map-marker-radius-outline" size={18} color={colors.primary} />
+                      <Text style={styles.secondaryActionBtnText}>Gestionar centros de trabajo</Text>
+                    </TouchableOpacity>
+                    {!!workCenters.length && (
+                      <View style={styles.centerListCard}>
+                        <Text style={styles.listHeader}>Centros configurados</Text>
+                        {workCenters.map((center) => (
+                          <View key={center.id} style={styles.centerRow}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.centerName}>{center.name}</Text>
+                              <Text style={styles.centerMeta}>
+                                Radio {Math.round(Number(center.radius_meters || 0))} m
+                                {center.address ? ` · ${center.address}` : ''}
+                              </Text>
+                            </View>
+                            <TouchableOpacity style={styles.iconActionBtn} onPress={() => openEditWorkCenterModal(center)}>
+                              <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.primary} />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.iconActionBtn} onPress={() => handleDeleteWorkCenter(center)}>
+                              <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.rejected} />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
                 }
               />
             </View>
@@ -1163,59 +1447,138 @@ export default function AdminScreen() {
       {/* Edit Employee Modal */}
       <Modal visible={editModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Editar Empleado</Text>
-            <Text style={styles.modalSubtitle}>{editingEmployee?.name}</Text>
-
-            <Text style={styles.modalLabel}>Nombre</Text>
-            <TextInput
-              style={styles.formInput}
-              value={editName}
-              onChangeText={setEditName}
-            />
-
-            <Text style={styles.modalLabel}>Email</Text>
-            <TextInput
-              style={styles.formInput}
-              value={editEmail}
-              onChangeText={setEditEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-
-            <Text style={styles.modalLabel}>Días de Vacaciones</Text>
-            <TextInput
-              style={styles.daysInput}
-              value={editDays}
-              onChangeText={setEditDays}
-              keyboardType="numeric"
-              maxLength={3}
-            />
-
-            <TouchableOpacity
-              style={[styles.deleteLink, { marginTop: 16 }]}
-              onPress={handleResetPassword}
+          <View style={[styles.modal, styles.editEmployeeModal]}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.editEmployeeModalContent}
             >
-              <MaterialCommunityIcons name="lock-reset" size={16} color={colors.primary} />
-              <Text style={[styles.deleteLinkText, { color: colors.primary }]}>Restablecer contraseña</Text>
-            </TouchableOpacity>
+              <Text style={styles.modalTitle}>Editar Empleado</Text>
+              <Text style={styles.modalSubtitle}>{editingEmployee?.name}</Text>
 
-            <TouchableOpacity
-              style={styles.deleteLink}
-              onPress={handleDeleteEmployee}
-            >
-              <MaterialCommunityIcons name="account-remove" size={16} color={colors.rejected} />
-              <Text style={styles.deleteLinkText}>Eliminar empleado</Text>
-            </TouchableOpacity>
+              <Text style={styles.modalLabel}>Nombre</Text>
+              <TextInput
+                style={styles.formInput}
+                value={editName}
+                onChangeText={setEditName}
+              />
 
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setEditModalVisible(false)}>
-                <Text style={styles.modalCancelText}>Cancelar</Text>
+              <Text style={styles.modalLabel}>Email</Text>
+              <TextInput
+                style={styles.formInput}
+                value={editEmail}
+                onChangeText={setEditEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+
+              <Text style={styles.modalLabel}>Días de Vacaciones</Text>
+              <TextInput
+                style={styles.daysInput}
+                value={editDays}
+                onChangeText={setEditDays}
+                keyboardType="numeric"
+                maxLength={3}
+              />
+
+              <Text style={styles.modalLabel}>Politica de Fichaje</Text>
+              <View style={styles.policyList}>
+                {ATTENDANCE_POLICIES.map((policy) => (
+                  <TouchableOpacity
+                    key={policy.value}
+                    style={[
+                      styles.policyCard,
+                      editAttendancePolicy === policy.value && styles.policyCardSelected,
+                    ]}
+                    onPress={() => setEditAttendancePolicy(policy.value)}
+                  >
+                    <Text
+                      style={[
+                        styles.policyTitle,
+                        editAttendancePolicy === policy.value && styles.policyTitleSelected,
+                      ]}
+                    >
+                      {policy.label}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.policyDescription,
+                        editAttendancePolicy === policy.value && styles.policyDescriptionSelected,
+                      ]}
+                    >
+                      {policy.description}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {editAttendancePolicy === 'assigned_center' && (
+                <>
+                  <Text style={styles.modalLabel}>Centro Asignado</Text>
+                  {workCenters.length === 0 ? (
+                    <View style={styles.inlineInfoCard}>
+                      <Text style={styles.inlineInfoText}>
+                        Antes de asignar esta politica, crea al menos un centro de trabajo con coordenadas y radio.
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.policyList}>
+                      {workCenters.map((center) => (
+                        <TouchableOpacity
+                          key={center.id}
+                          style={[
+                            styles.policyCard,
+                            editAssignedCenterId === center.id && styles.policyCardSelected,
+                          ]}
+                          onPress={() => setEditAssignedCenterId(center.id)}
+                        >
+                          <Text
+                            style={[
+                              styles.policyTitle,
+                              editAssignedCenterId === center.id && styles.policyTitleSelected,
+                            ]}
+                          >
+                            {center.name}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.policyDescription,
+                              editAssignedCenterId === center.id && styles.policyDescriptionSelected,
+                            ]}
+                          >
+                            {center.address || 'Sin direccion'} · Radio {Math.round(Number(center.radius_meters || 0))} m
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </>
+              )}
+
+              <TouchableOpacity
+                style={[styles.deleteLink, { marginTop: 16 }]}
+                onPress={handleResetPassword}
+              >
+                <MaterialCommunityIcons name="lock-reset" size={16} color={colors.primary} />
+                <Text style={[styles.deleteLinkText, { color: colors.primary }]}>Restablecer contraseña</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSaveEmployee}>
-                <Text style={styles.modalConfirmText}>Guardar Cambios</Text>
+
+              <TouchableOpacity
+                style={styles.deleteLink}
+                onPress={handleDeleteEmployee}
+              >
+                <MaterialCommunityIcons name="account-remove" size={16} color={colors.rejected} />
+                <Text style={styles.deleteLinkText}>Eliminar empleado</Text>
               </TouchableOpacity>
-            </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setEditModalVisible(false)}>
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSaveEmployee}>
+                  <Text style={styles.modalConfirmText}>Guardar Cambios</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1267,6 +1630,79 @@ export default function AdminScreen() {
                   onPress={handleCreateEmployee}
                 >
                   <Text style={styles.modalConfirmText}>Crear Perfil</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={workCenterModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modal, { maxHeight: '90%' }]}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>
+                {editingWorkCenter ? 'Editar centro de trabajo' : 'Nuevo centro de trabajo'}
+              </Text>
+              <Text style={styles.modalSubtitle}>
+                Configura la ubicacion y el radio permitido para empleados con fichaje restringido.
+              </Text>
+
+              <Text style={styles.modalLabel}>Nombre del centro</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Ej. Oficina Central"
+                value={centerName}
+                onChangeText={setCenterName}
+              />
+
+              <Text style={styles.modalLabel}>Direccion o referencia</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Calle, planta o descripcion"
+                value={centerAddress}
+                onChangeText={setCenterAddress}
+              />
+
+              <Text style={styles.modalLabel}>Latitud</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="28.123456"
+                value={centerLatitude}
+                onChangeText={setCenterLatitude}
+                keyboardType="numbers-and-punctuation"
+              />
+
+              <Text style={styles.modalLabel}>Longitud</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="-15.123456"
+                value={centerLongitude}
+                onChangeText={setCenterLongitude}
+                keyboardType="numbers-and-punctuation"
+              />
+
+              <Text style={styles.modalLabel}>Radio permitido (metros)</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="150"
+                value={centerRadius}
+                onChangeText={setCenterRadius}
+                keyboardType="numeric"
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => {
+                    setWorkCenterModalVisible(false);
+                    resetWorkCenterForm();
+                  }}
+                >
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSaveWorkCenter}>
+                  <Text style={styles.modalConfirmText}>Guardar</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -1504,6 +1940,16 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     fontSize: typography.sizes.md,
   },
+  secondaryActionBtn: {
+    backgroundColor: colors.white,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
+  secondaryActionBtnText: {
+    color: colors.primary,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.md,
+  },
   empCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1528,6 +1974,66 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  empMeta: {
+    fontSize: typography.sizes.xs,
+    color: colors.primary,
+    marginTop: 4,
+    fontWeight: typography.weights.semibold,
+  },
+  attendanceGeoText: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  locationLinkBtn: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: colors.primaryLight,
+  },
+  locationLinkText: {
+    color: colors.primary,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+  },
+  centerListCard: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  centerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.background,
+  },
+  centerName: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+  },
+  centerMeta: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  iconActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background,
   },
   daysChip: {
     alignItems: 'center',
@@ -1561,6 +2067,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     width: '100%',
+    maxHeight: '90%',
+  },
+  editEmployeeModal: {
+    paddingRight: 18,
+    paddingLeft: 18,
+  },
+  editEmployeeModalContent: {
+    paddingHorizontal: 6,
+    paddingBottom: 8,
   },
   modalTitle: {
     fontSize: typography.sizes.xl,
@@ -1680,6 +2195,69 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     color: colors.textPrimary,
     marginBottom: 16,
+  },
+  policyList: {
+    gap: 10,
+    marginBottom: 16,
+  },
+  policyCard: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    padding: 14,
+    backgroundColor: colors.white,
+  },
+  policyCardSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  policyTitle: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  policyTitleSelected: {
+    color: colors.primary,
+  },
+  policyDescription: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  policyDescriptionSelected: {
+    color: colors.primaryDark,
+  },
+  inlineInfoCard: {
+    backgroundColor: colors.background,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  inlineInfoText: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  locationInfoCard: {
+    backgroundColor: colors.background,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+  },
+  locationInfoLabel: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 6,
+    fontWeight: typography.weights.semibold,
+  },
+  locationInfoValue: {
+    fontSize: typography.sizes.sm,
+    color: colors.textPrimary,
+    fontWeight: typography.weights.semibold,
+    lineHeight: 20,
   },
   deleteLink: {
     flexDirection: 'row',

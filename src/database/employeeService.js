@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 
-const EMPLOYEE_PROFILE_COLUMNS = 'id, name, email, role, available_days, requires_password_change, auth_user_id, avatar_url';
+const EMPLOYEE_PROFILE_COLUMNS = 'id, name, email, role, available_days, requires_password_change, auth_user_id, avatar_url, attendance_policy, assigned_work_center_id';
 const AVATAR_BUCKET = 'avatars';
 export const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
