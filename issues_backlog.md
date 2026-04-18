@@ -67,7 +67,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción aplicada:* Inicialización de sesión con `getSession`, suscripción a `onAuthStateChange`, persistencia mediante `AsyncStorage` y desacoplamiento entre sesión Auth y perfil de empleado.
   - *Criterio de aceptación:* Cumplido. El usuario autenticado mantiene sesión tras reiniciar app y la navegación se hidrata correctamente.
 
-- [ ] **Issue nueva - Permitir a cada usuario subir y cambiar su foto de perfil**
+- [x] **Issue #33 - Permitir a cada usuario subir y cambiar su foto de perfil**
   - *Área:* Experiencia de usuario.
   - *Severidad:* Media.
   - *Tipo:* Nueva funcionalidad.
@@ -82,7 +82,8 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
     4. Añadir UI en `SettingsScreen` para previsualizar, cambiar y eliminar la foto de perfil, con estados de carga y error.
     5. Sustituir iniciales por avatar real en pantallas donde ya se muestran usuarios, manteniendo fallback visual cuando no haya imagen.
     6. Validar manualmente subida inicial, reemplazo, persistencia tras reinicio y comportamiento ante fallo de red o imagen inválida.
-  - *Criterios de aceptación:* El usuario autenticado puede actualizar su foto desde ajustes, la imagen persiste tras reiniciar sesión, se refleja en las vistas principales con fallback correcto y no permite modificar imágenes de otros usuarios.
+  - *Acción aplicada:* Añadido `avatar_url` en `employees`, bucket privado `avatars` en Supabase Storage con políticas de acceso por usuario/admin, RPC segura para actualizar la referencia, selector de imagen en `SettingsScreen`, refresco del perfil autenticado y reutilización de avatar real con fallback en ajustes y panel de administración.
+  - *Criterios de aceptación:* Cumplido. El usuario autenticado puede actualizar su foto desde ajustes, la imagen persiste tras reiniciar sesión, se refleja en las vistas principales con fallback correcto y no permite modificar imágenes de otros usuarios.
 
 - [ ] **Issue nueva - Configurar fichaje por geolocalización flexible por empleado**
   - *Área:* Operativa y control horario.
@@ -142,6 +143,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 ---
 
 ## ✅ Tareas Completadas
+- [x] **Issue #33 - Foto de perfil por usuario (18/04):** Implementada la subida, reemplazo y eliminación de avatar desde ajustes con `expo-image-picker`, Storage privado de Supabase, persistencia en `employees.avatar_url`, refresco del contexto autenticado y visualización del avatar en administración con fallback por iniciales.
 - [x] **Issue #1 - Gestión de empleados:** Altas, edición y bajas de personal implementadas en el panel de administración.
 - [x] **Issue #2 - Validar conflictos entre turnos asignados y vacaciones aprobadas:** Añadidas comprobaciones para evitar solapamientos en la planificación.
 - [x] **Issue #3 - Optimización de asignación de turnos mediante copia semanal o patrones:** Incorporadas mejoras para agilizar la planificación repetitiva.
