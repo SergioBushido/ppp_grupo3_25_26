@@ -15,9 +15,10 @@ import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { getTodayAttendance, registerAttendance } from '../database/attendanceService';
+import { getTodayAttendance, registerAttendanceWithLocation } from '../database/attendanceService';
 import { getTodayShiftForEmployee } from '../database/shiftService';
 import { getShiftConfig } from '../components/ShiftBadge';
+import { getCurrentAttendanceLocation } from '../lib/locationService';
 
 const MenuButton = ({ title, icon, gradientColors, onPress }) => (
   <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={styles.buttonContainer}>
@@ -40,6 +41,22 @@ export default function HomeScreen({ navigation }) {
   const [attendanceRecords, setAttendanceRecords] = useState(null);
   const [todayShift, setTodayShift] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const resolveLocationForAttendance = useCallback(async () => {
+    if (user?.attendance_policy === 'manual_only') {
+      throw new Error('Tu fichaje debe registrarse manualmente por administracion.');
+    }
+
+    if (user?.attendance_policy === 'assigned_center') {
+      return getCurrentAttendanceLocation();
+    }
+
+    try {
+      return await getCurrentAttendanceLocation();
+    } catch (_error) {
+      return null;
+    }
+  }, [user]);
 
   const loadHomeData = useCallback(async () => {
     if (!user) return;
@@ -88,7 +105,8 @@ export default function HomeScreen({ navigation }) {
           onPress: async () => {
             try {
               setIsLoading(true);
-              await registerAttendance(user.id, type);
+              const location = await resolveLocationForAttendance();
+              await registerAttendanceWithLocation({ employee: user, type, location });
               await loadHomeData();
               Alert.alert('Éxito', `${actionName} registrada correctamente.`);
             } catch (error) {
