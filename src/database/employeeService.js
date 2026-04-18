@@ -1,6 +1,54 @@
 import { supabase } from '../lib/supabase';
 
-const EMPLOYEE_PROFILE_COLUMNS = 'id, name, email, role, available_days, requires_password_change, auth_user_id';
+const EMPLOYEE_PROFILE_COLUMNS = 'id, name, email, role, available_days, requires_password_change, auth_user_id, avatar_url';
+const AVATAR_BUCKET = 'avatars';
+export const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+
+function getAvatarExtension(mimeType) {
+  if (mimeType === 'image/png') return 'png';
+  if (mimeType === 'image/webp') return 'webp';
+  return 'jpg';
+}
+
+async function createSignedAvatarUrl(path) {
+  if (!path) return null;
+
+  const { data, error } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .createSignedUrl(path, 60 * 60 * 24 * 7);
+
+  if (error) throw error;
+  return data?.signedUrl || null;
+}
+
+async function hydrateEmployeeProfile(profile) {
+  if (!profile) return profile;
+
+  const avatarPath = profile.avatar_url || null;
+  if (!avatarPath) {
+    return {
+      ...profile,
+      avatar_storage_path: null,
+      avatar_url: null,
+    };
+  }
+
+  try {
+    const signedUrl = await createSignedAvatarUrl(avatarPath);
+    return {
+      ...profile,
+      avatar_storage_path: avatarPath,
+      avatar_url: signedUrl,
+    };
+  } catch (error) {
+    console.warn('No se pudo firmar la URL del avatar', error);
+    return {
+      ...profile,
+      avatar_storage_path: avatarPath,
+      avatar_url: null,
+    };
+  }
+}
 
 export async function getAllEmployees() {
   const { data, error } = await supabase
@@ -9,7 +57,7 @@ export async function getAllEmployees() {
     .order('name');
   
   if (error) throw error;
-  return data;
+  return Promise.all((data || []).map(hydrateEmployeeProfile));
 }
 
 export async function getEmployeeById(id) {
@@ -20,7 +68,7 @@ export async function getEmployeeById(id) {
     .single();
   
   if (error) throw error;
-  return data;
+  return hydrateEmployeeProfile(data);
 }
 
 export async function getEmployeeByAuthUserId(authUserId) {
@@ -31,7 +79,7 @@ export async function getEmployeeByAuthUserId(authUserId) {
     .single();
 
   if (error) throw error;
-  return data;
+  return hydrateEmployeeProfile(data);
 }
 
 export async function signInWithPassword(email, password) {
@@ -140,5 +188,69 @@ export async function changePassword(employeeId, newPassword) {
 export async function resetEmployeePassword(employeeId, email) {
   await markPasswordChangeRequired(employeeId);
   await sendPasswordRecovery(email);
+}
+
+export async function uploadMyAvatar({ authUserId, asset, currentAvatarPath }) {
+  if (!authUserId) {
+    throw new Error('No hay una sesion valida para subir la imagen.');
+  }
+
+  if (!asset?.uri) {
+    throw new Error('No se ha seleccionado ninguna imagen valida.');
+  }
+
+  if (asset.fileSize && asset.fileSize > MAX_AVATAR_BYTES) {
+    throw new Error('La imagen supera el tamano maximo permitido de 2 MB.');
+  }
+
+  const fileExtension = getAvatarExtension(asset.mimeType);
+  const contentType = asset.mimeType || 'image/jpeg';
+  const filePath = `${authUserId}/avatar-${Date.now()}.${fileExtension}`;
+
+  const response = await fetch(asset.uri);
+  const arrayBuffer = await response.arrayBuffer();
+
+  const { error: uploadError } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .upload(filePath, arrayBuffer, {
+      cacheControl: '3600',
+      contentType,
+      upsert: false,
+    });
+
+  if (uploadError) throw uploadError;
+
+  try {
+    const { error: profileError } = await supabase.rpc('update_my_avatar_url', {
+      next_avatar_url: filePath,
+    });
+
+    if (profileError) throw profileError;
+
+    if (currentAvatarPath && currentAvatarPath !== filePath) {
+      await supabase.storage.from(AVATAR_BUCKET).remove([currentAvatarPath]);
+    }
+  } catch (error) {
+    await supabase.storage.from(AVATAR_BUCKET).remove([filePath]);
+    throw error;
+  }
+}
+
+export async function removeMyAvatar(currentAvatarPath) {
+  const { error } = await supabase.rpc('update_my_avatar_url', {
+    next_avatar_url: null,
+  });
+
+  if (error) throw error;
+
+  if (currentAvatarPath) {
+    const { error: storageError } = await supabase.storage
+      .from(AVATAR_BUCKET)
+      .remove([currentAvatarPath]);
+
+    if (storageError) {
+      console.warn('No se pudo borrar el archivo antiguo del avatar', storageError);
+    }
+  }
 }
 

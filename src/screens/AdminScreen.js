@@ -34,6 +34,7 @@ import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsF
 import { getAllAttendancesByDate } from '../database/attendanceService';
 import { VacationCard } from '../components/VacationCard';
 import { ShiftBadge } from '../components/ShiftBadge';
+import UserAvatar from '../components/UserAvatar';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -51,26 +52,6 @@ const SHIFT_OPTIONS = [
   { type: 'afternoon', label: 'Tarde', icon: 'weather-sunset' },
   { type: 'night', label: 'Noche', icon: 'weather-night' },
 ];
-
-const AVATAR_COLORS = [
-  '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
-  '#F06292', '#AED581', '#FFD54F', '#4DB6AC', '#7986CB'
-];
-
-const getInitials = (name) => {
-  if (!name) return '??';
-  return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-};
-
-const getAvatarColor = (name) => {
-  if (!name) return AVATAR_COLORS[0];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-};
-
 
 export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState('requests');
@@ -994,9 +975,12 @@ export default function AdminScreen() {
                 contentContainerStyle={styles.listContent}
                 renderItem={({ item }) => (
                   <View style={styles.empCard}>
-                    <View style={styles.empAvatar}>
-                      <Text style={styles.empAvatarText}>{item.name[0]}</Text>
-                    </View>
+                    <UserAvatar
+                      name={item.name}
+                      avatarUrl={item.avatar_url}
+                      size={44}
+                      shape="rounded"
+                    />
                     <View style={styles.empInfo}>
                       <Text style={styles.empName}>{item.name}</Text>
                       <Text style={styles.empEmail}>{item.email}</Text>
@@ -1533,19 +1517,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
-  },
-  empAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  empAvatarText: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold,
-    color: colors.white,
   },
   empInfo: { flex: 1 },
   empName: {

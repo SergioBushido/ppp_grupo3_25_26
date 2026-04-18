@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   StyleSheet,
@@ -7,22 +8,27 @@ import {
   Modal,
   TextInput,
   Alert,
-  ScrollView
+  ScrollView,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { changePassword } from '../database/employeeService';
+import { changePassword, MAX_AVATAR_BYTES, removeMyAvatar, uploadMyAvatar } from '../database/employeeService';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import UserAvatar from '../components/UserAvatar';
 
 export default function SettingsScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   
   // Settings modal
   const [passModalVisible, setPassModalVisible] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isAvatarLoading, setIsAvatarLoading] = useState(false);
+
+  const maxAvatarSizeMb = Math.round(MAX_AVATAR_BYTES / (1024 * 1024));
 
   const handlePasswordChange = async () => {
     if (newPassword.length < 6) {
@@ -45,6 +51,72 @@ export default function SettingsScreen() {
     }
   };
 
+  const handlePickAvatar = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galeria para seleccionar una foto de perfil.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+        mediaTypes: ['images'],
+      });
+
+      if (result.canceled || !result.assets?.[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (asset.fileSize && asset.fileSize > MAX_AVATAR_BYTES) {
+        Alert.alert('Imagen demasiado grande', `Selecciona una imagen de hasta ${maxAvatarSizeMb} MB.`);
+        return;
+      }
+
+      setIsAvatarLoading(true);
+      await uploadMyAvatar({
+        authUserId: user?.auth_user_id,
+        asset,
+        currentAvatarPath: user?.avatar_storage_path,
+      });
+      await refreshUser();
+      Alert.alert('Foto actualizada', 'Tu foto de perfil se ha actualizado correctamente.');
+    } catch (error) {
+      Alert.alert('Error', error.message || 'No se pudo actualizar la foto de perfil.');
+    } finally {
+      setIsAvatarLoading(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    Alert.alert(
+      'Eliminar foto',
+      'Tu perfil volvera a mostrar las iniciales como avatar.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsAvatarLoading(true);
+              await removeMyAvatar(user?.avatar_storage_path);
+              await refreshUser();
+              Alert.alert('Foto eliminada', 'Tu perfil vuelve a mostrar el avatar por defecto.');
+            } catch (error) {
+              Alert.alert('Error', error.message || 'No se pudo eliminar la foto de perfil.');
+            } finally {
+              setIsAvatarLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const isAdmin = user?.role === 'admin';
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -57,16 +129,49 @@ export default function SettingsScreen() {
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarContainer}>
-             <MaterialCommunityIcons 
-               name={isAdmin ? "shield-account" : "account"} 
-               size={48} 
-               color={colors.primary} 
-             />
+            <UserAvatar
+              name={user?.name}
+              avatarUrl={user?.avatar_url}
+              size={96}
+              iconName={isAdmin ? 'shield-account' : 'account'}
+            />
+            <TouchableOpacity
+              style={styles.avatarEditButton}
+              onPress={handlePickAvatar}
+              disabled={isAvatarLoading}
+            >
+              {isAvatarLoading ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <MaterialCommunityIcons name="camera-outline" size={18} color={colors.white} />
+              )}
+            </TouchableOpacity>
           </View>
           <Text style={styles.userName}>{user?.name || 'Usuario'}</Text>
           <Text style={styles.userEmail}>{user?.email || 'Sin correo'}</Text>
           <View style={[styles.roleBadge, isAdmin ? styles.adminBadge : styles.employeeBadge]}>
             <Text style={styles.roleText}>{isAdmin ? 'Administrador' : 'Empleado'}</Text>
+          </View>
+          <Text style={styles.avatarHint}>JPG, PNG o WEBP. Tamano maximo: {maxAvatarSizeMb} MB.</Text>
+          <View style={styles.avatarActions}>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, isAvatarLoading && styles.secondaryBtnDisabled]}
+              onPress={handlePickAvatar}
+              disabled={isAvatarLoading}
+            >
+              <MaterialCommunityIcons name="image-edit-outline" size={18} color={colors.primary} />
+              <Text style={styles.secondaryBtnText}>{user?.avatar_url ? 'Cambiar foto' : 'Subir foto'}</Text>
+            </TouchableOpacity>
+            {!!user?.avatar_storage_path && (
+              <TouchableOpacity
+                style={[styles.removeAvatarBtn, isAvatarLoading && styles.secondaryBtnDisabled]}
+                onPress={handleRemoveAvatar}
+                disabled={isAvatarLoading}
+              >
+                <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.rejected} />
+                <Text style={styles.removeAvatarText}>Eliminar</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -188,13 +293,23 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.primaryLight,
+    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  avatarEditButton: {
+    position: 'absolute',
+    right: -6,
+    bottom: 2,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: colors.white,
   },
   userName: {
     fontSize: typography.sizes.lg,
@@ -223,6 +338,51 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     color: colors.textPrimary,
     textTransform: 'uppercase',
+  },
+  avatarHint: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    marginTop: 14,
+    textAlign: 'center',
+  },
+  avatarActions: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 16,
+    flexWrap: 'wrap',
+  },
+  secondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 14,
+  },
+  secondaryBtnDisabled: {
+    opacity: 0.6,
+  },
+  secondaryBtnText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: colors.primary,
+  },
+  removeAvatarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FDECEC',
+    borderRadius: 14,
+  },
+  removeAvatarText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: colors.rejected,
   },
   daysCard: {
     backgroundColor: colors.primary,
