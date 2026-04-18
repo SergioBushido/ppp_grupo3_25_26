@@ -17,5 +17,23 @@ Este archivo documenta los agentes de IA y colaboradores involucrados en el desa
   - Validación de funcionalidades y diseño.
   - Pruebas en dispositivos físicos (Expo Go) y emuladores.
 
+## Criterio para Nuevas Issues Técnicas
+- Las incidencias críticas o de arquitectura deben documentarse con una estructura mínima común para facilitar análisis, implementación y seguimiento.
+- Cada issue técnica debería incluir:
+  - **Título claro** orientado a acción.
+  - **Problema actual** y riesgo asociado.
+  - **Impacto** funcional, técnico o de seguridad.
+  - **Objetivo** esperado tras la solución.
+  - **Alcance**: módulos, servicios o tablas afectadas.
+  - **Propuesta técnica** a alto nivel.
+  - **Criterios de aceptación** verificables.
+  - **Casos a validar** o pruebas manuales esperadas.
+  - **Prioridad, severidad y tipo**.
+- Orden recomendado de trabajo:
+  - primero seguridad e integridad de datos,
+  - después consistencia funcional,
+  - después experiencia de usuario y mejoras visuales.
+- Cuando una issue afecte lógica crítica de negocio, se priorizará mover la lógica sensible a backend, SQL o servicios transaccionales antes que resolverla solo en cliente.
+
 ---
 *Generado automáticamente durante el proceso de desarrollo.*
