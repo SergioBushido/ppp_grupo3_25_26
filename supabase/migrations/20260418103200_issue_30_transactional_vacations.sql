@@ -7,8 +7,8 @@ security definer
 set search_path = public
 as $$
 declare
-  vacation_record public.vacations%rowtype;
-  updated_vacation public.vacations%rowtype;
+  vacation_record public.vacations;
+  updated_vacation public.vacations;
   employee_days integer;
   requested_days integer;
 begin
@@ -72,8 +72,8 @@ security definer
 set search_path = public
 as $$
 declare
-  vacation_record public.vacations%rowtype;
-  updated_vacation public.vacations%rowtype;
+  vacation_record public.vacations;
+  updated_vacation public.vacations;
   employee_days integer;
   requested_days integer;
 begin

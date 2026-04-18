@@ -47,14 +47,15 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción aplicada:* Corregida la variable `days` no definida en mensajes y corregido el retorno inválido de `editRequestVacation`.
   - *Criterio de aceptación:* Cumplido parcialmente. Los mensajes y el retorno ya son coherentes; queda recomendable revisar a futuro la regla de negocio completa del saldo en escenarios complejos.
 
-- [ ] **Issue #30 - Hacer transaccional la aprobación/cancelación de vacaciones**
+- [x] **Issue #30 - Hacer transaccional la aprobación/cancelación de vacaciones**
   - *Área:* Arquitectura y escalabilidad.
   - *Severidad:* Alta.
   - *Tipo:* Riesgo potencial.
   - *Impacto:* Inconsistencias de datos si una operación parcial actualiza `vacations` pero no `employees.available_days` (o viceversa).
-  - *Módulos afectados:* `src/database/vacationService.js` y funciones SQL/RPC de Supabase.
-  - *Acción recomendada:* Encapsular cada operación en una única transacción SQL/RPC idempotente.
-  - *Criterio de aceptación:* Cada cambio de estado deja datos consistentes incluso ante fallos intermedios o reintentos.
+  - *Módulos afectados:* `src/database/vacationService.js` y `supabase/migrations/20260418103200_issue_30_transactional_vacations.sql`.
+  - *Problemas encontrados:* La app seguía aprobando/cancelando vacaciones con dos escrituras separadas y podía dejar datos inconsistentes. Durante el despliegue en Supabase SQL Editor apareció además un falso positivo de RLS sobre `vacation_record` y un error `42P01 relation "vacation_record" does not exist` al ejecutar bloques parciales o interpretar de forma problemática `%rowtype`.
+  - *Solución aplicada:* Se movió la lógica crítica a las RPCs `approve_vacation_transactional` y `cancel_vacation_transactional` con bloqueo `FOR UPDATE`, validación de estado y actualización atómica de vacaciones y saldo. Para evitar problemas del editor de Supabase, la migración quedó usando el tipo compuesto `public.vacations` en lugar de `%rowtype`, y se documentó su ejecución completa en el SQL Editor.
+  - *Criterio de aceptación:* Cumplido. Aprobación y cancelación se ejecutan ya desde RPC transaccional y la migración quedó aplicada en Supabase sin errores.
 
 #### 🟠 Importante (Siguiente iteración)
 - [x] **Issue #28 - Implementar sesión persistente real en AuthContext**
