@@ -29,6 +29,11 @@ La aplicación utiliza **Supabase** como backend en la nube, lo que permite la s
     - Desglose por tipo (Mañana, Tarde, Noche).
     - Conteo exacto de días de vacaciones disfrutados.
 
+### 📍 Fichaje con Geolocalización Flexible
+- **Política por empleado:** El administrador puede configurar fichaje libre (`anywhere`), validado por centro (`assigned_center`) o solo manual (`manual_only`).
+- **Centros de trabajo:** Se pueden definir centros con nombre, dirección, coordenadas y radio permitido en metros.
+- **Trazabilidad:** Cada fichaje puede guardar coordenadas, precisión GPS, centro validado y estado de validación para auditoría desde el panel admin.
+
 ## 🛠️ Stack Tecnológico
 
 - **Framework:** React Native con Expo SDK 50+.
@@ -66,6 +71,18 @@ src/
     ```bash
     npx expo start
     ```
+
+## ✅ Validación Manual Recomendada
+
+Para cerrar la operativa de fichaje con geolocalización, conviene ejecutar esta batería mínima en dispositivo real:
+
+1. **Empleado con `anywhere`:** registrar entrada/salida con ubicación disponible y confirmar que el fichaje se guarda y aparece en admin con estado `optional_captured`.
+2. **Empleado con `anywhere` sin GPS:** denegar permiso o provocar fallo de ubicación y confirmar que el fichaje sigue permitiéndose con estado `optional_missing`.
+3. **Empleado con `assigned_center` dentro de radio:** situarse dentro del radio configurado y confirmar que el fichaje se registra con estado `validated_center`, distancia y centro asociado.
+4. **Empleado con `assigned_center` fuera de radio:** intentar fichar lejos del centro y verificar que la app bloquea la acción con mensaje claro.
+5. **Empleado con `assigned_center` y GPS impreciso:** repetir la prueba con mala cobertura para confirmar que se bloquea cuando la precisión supera el umbral permitido.
+6. **Empleado con `manual_only`:** comprobar que el botón en inicio se muestra como fichaje manual y que el registro desde app queda rechazado.
+7. **Cambio de política desde admin:** modificar la política o el centro asignado y comprobar que el siguiente fichaje usa la configuración vigente sin depender de datos obsoletos en memoria.
 
 ---
 Desarrollado para el **Anteproyecto de 3º DAM** 

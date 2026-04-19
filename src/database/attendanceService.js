@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getEmployeeById } from './employeeService';
 import { getWorkCenterById } from './workCenterService';
 import { calculateDistanceMeters } from '../lib/locationService';
 
@@ -46,7 +47,9 @@ export async function registerAttendanceWithLocation({ employee, type, location 
     throw new Error('No se ha encontrado el empleado autenticado.');
   }
 
-  const todayRecords = await getTodayAttendance(employee.id);
+  const currentEmployee = await getEmployeeById(employee.id);
+
+  const todayRecords = await getTodayAttendance(currentEmployee.id);
 
   if (type === 'in' && todayRecords.some((record) => record.type === 'in')) {
     throw new Error('Ya has registrado una entrada hoy.');
@@ -61,20 +64,20 @@ export async function registerAttendanceWithLocation({ employee, type, location 
   let locationStatus = 'not_required';
   let locationNote = null;
 
-  if (employee.attendance_policy === 'manual_only') {
+  if (currentEmployee.attendance_policy === 'manual_only') {
     throw new Error('Tu fichaje debe registrarse manualmente por administracion.');
   }
 
-  if (employee.attendance_policy === 'assigned_center') {
-    if (!employee.assigned_work_center_id) {
+  if (currentEmployee.attendance_policy === 'assigned_center') {
+    if (!currentEmployee.assigned_work_center_id) {
       throw new Error('No tienes un centro de trabajo asignado para fichar.');
     }
 
-    if (!location?.latitude || !location?.longitude) {
+    if (location?.latitude == null || location?.longitude == null) {
       throw new Error('Necesitas activar la ubicacion para registrar el fichaje en tu centro.');
     }
 
-    const center = await getWorkCenterById(employee.assigned_work_center_id);
+    const center = await getWorkCenterById(currentEmployee.assigned_work_center_id);
 
     if (!center?.id) {
       throw new Error('El centro asignado no existe o ya no esta disponible.');
@@ -98,8 +101,8 @@ export async function registerAttendanceWithLocation({ employee, type, location 
     validatedWorkCenterId = center.id;
     locationStatus = 'validated_center';
     locationNote = center.name;
-  } else if (employee.attendance_policy === 'anywhere') {
-    if (location?.latitude && location?.longitude) {
+  } else if (currentEmployee.attendance_policy === 'anywhere') {
+    if (location?.latitude != null && location?.longitude != null) {
       locationStatus = 'optional_captured';
       locationNote = 'Ubicacion capturada';
     } else {
@@ -111,7 +114,7 @@ export async function registerAttendanceWithLocation({ employee, type, location 
   const { data, error } = await supabase
     .from('attendances')
     .insert([{
-      employee_id: employee.id,
+      employee_id: currentEmployee.id,
       type,
       latitude: location?.latitude ?? null,
       longitude: location?.longitude ?? null,

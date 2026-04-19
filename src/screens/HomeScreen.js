@@ -124,6 +124,9 @@ export default function HomeScreen({ navigation }) {
     if (isLoading || !attendanceRecords) {
       return { title: 'Cargando...', icon: 'clock-outline', gradient: colors.uiGradients.action };
     }
+    if (user?.attendance_policy === 'manual_only') {
+      return { title: 'Fichaje Manual', icon: 'clipboard-account-outline', gradient: ['#64748B', '#475569'] };
+    }
     const hasIn = attendanceRecords.some(r => r.type === 'in');
     const hasOut = attendanceRecords.some(r => r.type === 'out');
     
