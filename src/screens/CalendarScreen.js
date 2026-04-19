@@ -76,6 +76,8 @@ export default function CalendarScreen({ navigation }) {
       if (user.role === 'admin') {
         setEmployees(empsData.filter(e => e.role === 'employee'));
       }
+    } catch (e) {
+      console.error('[Calendar] Error al cargar datos:', e);
     } finally {
       setLoading(false);
     }

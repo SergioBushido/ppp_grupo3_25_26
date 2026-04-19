@@ -1067,12 +1067,6 @@ export default function AdminScreen() {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      loadAll();
-    }, [loadAll])
-  );
-
   return (
     <View style={styles.container}>
       {/* Header */}

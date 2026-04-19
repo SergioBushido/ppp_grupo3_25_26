@@ -163,10 +163,15 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Severidad:* Crítica.
   - *Criterio de aceptación:* Cumplido. La edición de vacaciones se ejecuta ahora desde RPC transaccional. Si falla cualquier paso, la transacción se revierte completamente sin dejar estado inconsistente.
 
-- [ ] **Issue #38 - Estabilidad y Robustez: Manejo de errores y duplicados (A-02, A-03, A-04, L-03):**
-  - *Problema:* Pantallas críticas (`Vacations`, `Calendar`) sin `try/catch`, múltiples `useFocusEffect` redundantes y comparaciones de fecha por referencia.
-  - *Objetivo:* Asegurar que la app no se cuelgue ante fallos de red y optimizar renders.
+- [x] **Issue #38 - Estabilidad y Robustez: Manejo de errores y duplicados (A-02, A-03, A-04, L-03):**
+  - *Problema:* Pantallas críticas (`Vacations`, `Calendar`) sin `try/catch`, `useFocusEffect` duplicado en AdminScreen y comparación de Date por referencia en RequestVacationScreen.
+  - *Solución aplicada:*
+    - **A-02:** Eliminado `useFocusEffect` duplicado en `AdminScreen.js` (líneas 1070-1074).
+    - **A-03:** Añadido `try/catch/finally` en `VacationsScreen.loadVacations` con `Alert` de error.
+    - **A-04:** Añadido `catch` en `CalendarScreen.loadData` para capturar errores de red.
+    - **L-03:** Corregida comparación `startDate !== endDate` a `startDate.getTime() !== endDate.getTime()` en `RequestVacationScreen`.
   - *Severidad:* Alta.
+  - *Criterio de aceptación:* Cumplido. La app no se bloquea ante fallos de red, AdminScreen no duplica cargas y la comparación de fechas es correcta por valor.
 
 - [ ] **Issue #39 - Seguridad y Limpieza de Entorno (C-02):**
   - *Acción:* Implementar pre-commit hooks para evitar fugas de `.env` y documentar rotado de claves.

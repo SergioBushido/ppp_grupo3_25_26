@@ -163,7 +163,7 @@ export default function RequestVacationScreen({ navigation }) {
             <Text style={{fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold}}>
               {format(startDate, "d MMM", { locale: es })}
             </Text>
-            {startDate && endDate && startDate !== endDate && (
+            {startDate && endDate && startDate.getTime() !== endDate.getTime() && (
               <>
                <MaterialCommunityIcons name="arrow-right" size={16} color={colors.textMuted} style={{marginHorizontal: 12}} />
                <Text style={{fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold}}>
