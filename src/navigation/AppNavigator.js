@@ -52,7 +52,7 @@ function MainTabs() {
         tabBarStyle: [
           styles.tabBar,
           {
-            height: 70 + insets.bottom,
+            height: 75 + insets.bottom,
             paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
           }
         ],
