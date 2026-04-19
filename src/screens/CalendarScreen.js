@@ -33,6 +33,8 @@ import { getAllEmployees } from '../database/employeeService';
 import { ShiftBadge, getShiftConfig } from '../components/ShiftBadge';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
@@ -107,8 +109,8 @@ export default function CalendarScreen({ navigation }) {
       '¿Estás seguro de que deseas eliminar este turno?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Eliminar', 
+        {
+          text: 'Eliminar',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -127,17 +129,17 @@ export default function CalendarScreen({ navigation }) {
     if (!selectedEmp || !selectedDay) return;
     try {
       const dateStr = format(selectedDay, 'yyyy-MM-dd');
-      
+
       const empShifts = shifts.filter(s => s.date === dateStr && s.employee_id === selectedEmp.id);
       if (empShifts.length > 0) {
         Alert.alert('Error', 'El empleado ya tiene un turno este día.');
         return;
       }
-      
-      const empVacations = vacations.filter(v => 
-        v.employee_id === selectedEmp.id && 
-        v.status === 'approved' && 
-        dateStr >= v.start_date && 
+
+      const empVacations = vacations.filter(v =>
+        v.employee_id === selectedEmp.id &&
+        v.status === 'approved' &&
+        dateStr >= v.start_date &&
         dateStr <= v.end_date
       );
       if (empVacations.length > 0) {
@@ -176,11 +178,11 @@ export default function CalendarScreen({ navigation }) {
         const start = parseISO(v.start_date);
         const end = parseISO(v.end_date);
         const d = new Date(date);
-        d.setHours(0,0,0,0);
+        d.setHours(0, 0, 0, 0);
         const s = new Date(start);
-        s.setHours(0,0,0,0);
+        s.setHours(0, 0, 0, 0);
         const e = new Date(end);
-        e.setHours(0,0,0,0);
+        e.setHours(0, 0, 0, 0);
         return d >= s && d <= e && (selectedEmployeeFilter === 'all' || String(v.employee_id) === selectedEmployeeFilter);
       } catch (err) {
         return false;
@@ -264,7 +266,7 @@ export default function CalendarScreen({ navigation }) {
   const selectedDayVacations = selectedDay ? getVacationsForDay(selectedDay) : [];
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
       refreshControl={
@@ -272,12 +274,14 @@ export default function CalendarScreen({ navigation }) {
       }
     >
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitleCenter}>Horario</Text>
-        <View style={{ width: 44 }} />
+      <View >
+        <SafeAreaView style={styles.header} edges={['top']}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitleCenter}>Horario</Text>
+          <View style={{ width: 44 }} />
+        </SafeAreaView>
       </View>
 
       <View style={styles.viewToggleContainer}>
@@ -365,7 +369,7 @@ export default function CalendarScreen({ navigation }) {
                       )}
                     </View>
                     {user.role === 'admin' && (
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         onPress={() => handleDeleteShift(s.id)}
                         style={styles.deleteBtn}
                       >
@@ -379,7 +383,7 @@ export default function CalendarScreen({ navigation }) {
                 <Text style={styles.noShiftText}>Nadie asignado este día</Text>
               )}
               {user.role === 'admin' && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.addShiftBtn}
                   onPress={() => setAssignmentModalVisible(true)}
                 >
@@ -478,8 +482,6 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.white,
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
