@@ -183,9 +183,15 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Propuesta:* Dividir en componentes independientes por cada pestaña y extraer modales.
   - *Severidad:* Alta (Técnica).
 
-- [ ] **Issue #41 - Consistencia Visual y Limpieza de Código (A-05, A-06, M-04, M-05, M-06, M-07, M-10):**
-  - *Acción:* Unificar iconos de `ShiftBadge`, centralizar `LocaleConfig`, eliminar funciones muertas (`handleFillAll`, `construirMatrizPDF`) e imports redundantes.
+- [x] **Issue #41 - Consistencia Visual y Limpieza de Código (A-05, A-06, M-06, M-07, M-10):**
+  - *Solución aplicada:*
+    - **A-05:** Corregidos iconos de `ShiftBadge` (`wrench` → `weather-sunset` / `weather-night`).
+    - **A-06:** Centralizado `LocaleConfig` en `src/config/calendarLocale.js`, importado una vez en `App.js` y eliminadas 3 copias idénticas.
+    - **M-06:** Eliminada función muerta `handleFillAll`.
+    - **M-07:** Sustituido import dinámico de `deleteShift` por import estático ya existente.
+    - **M-10:** Eliminada función muerta `construirMatrizPDF`.
   - *Severidad:* Media.
+  - *Criterio de aceptación:* Cumplido. Iconos coherentes, configuración centralizada y ~60 líneas de código muerto eliminadas.
 
 - [ ] **Issue #42 - Integridad de Usuarios en Borrado de Empleados (M-02):**
   - *Acción:* Crear Edge Function para eliminar el usuario de `auth.users` cuando se borra un empleado.

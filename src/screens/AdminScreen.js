@@ -18,21 +18,12 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, addDays, startOfMonth, endOfMonth, subMonths, addMonths, parseISO, differenceInCalendarDays, startOfWeek, endOfWeek, subWeeks, addWeeks, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar, LocaleConfig } from 'react-native-calendars';
+import { Calendar } from 'react-native-calendars';
 import { useFocusEffect } from '@react-navigation/native'
 import { useAuth } from '../context/AuthContext';
-
-LocaleConfig.locales['es'] = {
-  monthNames: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
-  monthNamesShort: ['Ene.', 'Feb.', 'Mar', 'Abr', 'May', 'Jun', 'Jul.', 'Ago', 'Sept.', 'Oct.', 'Nov.', 'Dic.'],
-  dayNames: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
-  dayNamesShort: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
-  today: 'Hoy'
-};
-LocaleConfig.defaultLocale = 'es';
 import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations, requestVacation, cancelVacation, reactiveVacation, deleteVacation } from '../database/vacationService';
 import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee, resetEmployeePassword } from '../database/employeeService';
-import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts, updateShift, getShiftsByEmployee } from '../database/shiftService';
+import { getShiftsByDate, createShift, deleteShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts, updateShift, getShiftsByEmployee } from '../database/shiftService';
 import { createManualAttendanceByAdmin, getRecentAttendances, invalidateAttendanceByAdmin } from '../database/attendanceService';
 import { createWorkCenter, deleteWorkCenter, getAllWorkCenters, updateWorkCenter } from '../database/workCenterService';
 import { VacationCard } from '../components/VacationCard';
@@ -179,32 +170,7 @@ export default function AdminScreen() {
   // Estado para exportación PDF
   const [exportandoPDF, setExportandoPDF] = useState(false);
 
-  // Construye la matriz mensual para el PDF (usa estados locales)
-  const construirMatrizPDF = () => {
-    const year = reportMonth.getFullYear();
-    const month = reportMonth.getMonth() + 1;
-    const diasMes = new Date(year, month, 0).getDate();
-    return employees.map(emp => {
-      const turnos = [];
-      const empShifts = reportData.find(e => e.id === emp.id)?.shifts || [];
-      for (let d = 1; d <= diasMes; d++) {
-        const turno = empShifts.find(t => Number(t.dia) === d);
-        if (turno) {
-          let tipo = '';
-          if (turno.shift_type === 'morning') tipo = 'M';
-          else if (turno.shift_type === 'afternoon') tipo = 'T';
-          else if (turno.shift_type === 'night') tipo = 'N';
-          turnos.push({ dia: d, tipo });
-        }
-      }
-      const vacaciones = [];
-      const empVac = reportData.find(e => e.id === emp.id)?.vacacionesDias || [];
-      for (let d = 1; d <= diasMes; d++) {
-        if (empVac.includes(d)) vacaciones.push({ dia: d });
-      }
-      return { nombre: emp.name, turnos, vacaciones };
-    });
-  };
+
 
   // Exportar PDF detallado
   const handleExportarPDF = async () => {
@@ -627,9 +593,7 @@ export default function AdminScreen() {
     return days;
   };
 
-  const handleFillAll = (type) => {
-    // Deprecated with interactive calendar, but kept minimal to avoid breaks if referenced.
-  };
+
 
   const handleAddShift = async () => {
     if (!selectedEmp) return;
@@ -727,7 +691,6 @@ export default function AdminScreen() {
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Eliminar', style: 'destructive', onPress: async () => {
-          const { deleteShift } = await import('../database/shiftService');
           await deleteShift(shift.id);
           await loadDayShifts();
         }
