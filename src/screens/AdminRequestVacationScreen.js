@@ -139,10 +139,8 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
     try {
       await editRequestVacation({
         vacation_id: employeeVacation?.id,
-        employee_id: employeeVacation?.employee_id,
         start_date: formatVacationDate(startDate),
         end_date: formatVacationDate(effectiveEnd),
-        available_days: newAvailableDays
       });
 
       await refreshUser();

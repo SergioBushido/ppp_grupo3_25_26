@@ -95,45 +95,16 @@ export async function requestVacation({ employee_id, start_date, end_date, reaso
 }
 
 
-export async function editRequestVacation({ vacation_id, employee_id, start_date, end_date, available_days }) {
-  
-  const newDays = differenceInCalendarDays(parseISO(end_date), parseISO(start_date)) + 1;
+// Editar vacaciones aprobadas de forma transaccional (RPC backend)
+export async function editRequestVacation({ vacation_id, start_date, end_date }) {
+  const { data, error } = await supabase.rpc('edit_vacation_transactional', {
+    p_vacation_id: vacation_id,
+    p_new_start_date: start_date,
+    p_new_end_date: end_date,
+  });
 
-  const newAvailableDays =  available_days - newDays
-
-  // Check available days
-  const { data: emp, error: empError } = await supabase
-    .from('employees')
-    .select('available_days')
-    .eq('id', employee_id)
-    .single();
-
-  if (empError || !emp) throw new Error('Empleado no encontrado');
-  
-  if (available_days < newDays) {
-    throw new Error(`No tienes suficientes días disponibles. Necesitas ${newDays}, tienes ${emp.available_days}.`);
-  }
-
-  //Actualizar días
-  const { error: employeeError } = await supabase
-    .from('employees')
-    .update([{available_days: newAvailableDays}])
-    .eq('id', employee_id)
-    .select('id')
-    .single();
-
-  if (employeeError) throw employeeError;
-
-  const { data: vacationData, error: vacationError } = await supabase
-    .from('vacations')
-    .update([{ start_date, end_date}])
-    .eq('id', vacation_id)
-    .select()
-    .single();
-  
-  if (vacationError) throw vacationError;
-
-  return vacationData.id;
+  if (error) throw error;
+  return data;
 }
 
 export async function approveVacation(vacationId) {

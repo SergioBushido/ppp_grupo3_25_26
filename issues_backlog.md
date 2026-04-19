@@ -147,6 +147,45 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción recomendada:* Configurar `jest`/`jest-expo`, mocks de Supabase y casos de prueba críticos.
   - *Criterio de aceptación:* La suite se ejecuta en local y cubre al menos reglas principales de vacaciones/auth/fichajes.
 
+### 🔍 Auditoría Técnica Profunda (19/04)
+
+> [!IMPORTANT]
+> Los detalles técnicos completos y la priorización se encuentran en el informe de [Auditoría Técnica](file:///c:/Users/sergi/Proyectos/ppp_grupo3/auditorias/2026-04-19_auditoria_tecnica.md).
+> Todas las implementaciones deben cumplir con el **[Criterio para Nuevas Issues Técnicas](file:///c:/Users/sergi/Proyectos/ppp_grupo3/AGENTS.md)** definido en `AGENTS.md`.
+
+#### 🔴 Prioridad Alta (Integridad y Estabilidad)
+- [x] **Issue #37 - Refactor transaccional de `editRequestVacation` (C-01):**
+  - *Problema:* La edición de vacaciones no era atómica y podía dejar saldos inconsistentes si fallaba a mitad.
+  - *Impacto:* Crítico para la integridad de datos de recursos humanos.
+  - *Solución aplicada:* Creada RPC `edit_vacation_transactional` en Supabase con bloqueo `FOR UPDATE` en las filas de `vacations` y `employees`, cálculo atómico del diferencial de días y validación de saldo dentro de la transacción. Simplificado el servicio cliente para delegar toda la lógica a la RPC, eliminando los cálculos de saldo en cliente y las dos escrituras separadas.
+  - *Migración:* `supabase/migrations/20260419125400_issue_37_transactional_edit_vacation.sql`
+  - *Archivos modificados:* `src/database/vacationService.js`, `src/screens/AdminRequestVacationScreen.js`.
+  - *Severidad:* Crítica.
+  - *Criterio de aceptación:* Cumplido. La edición de vacaciones se ejecuta ahora desde RPC transaccional. Si falla cualquier paso, la transacción se revierte completamente sin dejar estado inconsistente.
+
+- [ ] **Issue #38 - Estabilidad y Robustez: Manejo de errores y duplicados (A-02, A-03, A-04, L-03):**
+  - *Problema:* Pantallas críticas (`Vacations`, `Calendar`) sin `try/catch`, múltiples `useFocusEffect` redundantes y comparaciones de fecha por referencia.
+  - *Objetivo:* Asegurar que la app no se cuelgue ante fallos de red y optimizar renders.
+  - *Severidad:* Alta.
+
+- [ ] **Issue #39 - Seguridad y Limpieza de Entorno (C-02):**
+  - *Acción:* Implementar pre-commit hooks para evitar fugas de `.env` y documentar rotado de claves.
+  - *Severidad:* Crítica.
+
+#### 🟠 Prioridad Media (Refactor y Deuda Técnica)
+- [ ] **Issue #40 - Refactor Estructural de `AdminScreen.js` (A-01):**
+  - *Problema:* Fichero de ~3000 líneas. Inmantenible y lento.
+  - *Propuesta:* Dividir en componentes independientes por cada pestaña y extraer modales.
+  - *Severidad:* Alta (Técnica).
+
+- [ ] **Issue #41 - Consistencia Visual y Limpieza de Código (A-05, A-06, M-04, M-05, M-06, M-07, M-10):**
+  - *Acción:* Unificar iconos de `ShiftBadge`, centralizar `LocaleConfig`, eliminar funciones muertas (`handleFillAll`, `construirMatrizPDF`) e imports redundantes.
+  - *Severidad:* Media.
+
+- [ ] **Issue #42 - Integridad de Usuarios en Borrado de Empleados (M-02):**
+  - *Acción:* Crear Edge Function para eliminar el usuario de `auth.users` cuando se borra un empleado.
+  - *Severidad:* Media.
+
 #### 🟡 Mejora continua
 - [x] **Mejora interna - Ocultar credenciales demo en producción**
   - *Área:* Seguridad y privacidad.
