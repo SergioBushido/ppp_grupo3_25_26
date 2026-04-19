@@ -100,8 +100,8 @@ export default function HomeScreen({ navigation }) {
       `¿Confirmas registrar tu ${actionName.toLowerCase()} en este momento?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Confirmar', 
+        {
+          text: 'Confirmar',
           onPress: async () => {
             try {
               setIsLoading(true);
@@ -114,7 +114,7 @@ export default function HomeScreen({ navigation }) {
               Alert.alert('Error', error.message || 'Error al registrar el fichaje.');
               setIsLoading(false);
             }
-          } 
+          }
         }
       ]
     );
@@ -126,7 +126,7 @@ export default function HomeScreen({ navigation }) {
     }
     const hasIn = attendanceRecords.some(r => r.type === 'in');
     const hasOut = attendanceRecords.some(r => r.type === 'out');
-    
+
     if (!hasIn) return { title: 'Registrar Entrada', icon: 'login', gradient: colors.uiGradients.action }; // Verde
     if (hasIn && !hasOut) return { title: 'Registrar Salida', icon: 'logout', gradient: ['#F59E0B', '#D97706'] }; // Naranja
     return { title: 'Jornada Completada', icon: 'check-circle-outline', gradient: ['#9CA3AF', '#6B7280'] }; // Gris
@@ -137,25 +137,27 @@ export default function HomeScreen({ navigation }) {
   const renderTodayShift = () => {
     if (isLoading) return <Text style={styles.todayShiftText}>Cargando turno...</Text>;
     if (!todayShift) return <Text style={styles.todayShiftText}>Hoy no tienes turno asignado.</Text>;
-    
+
     const config = getShiftConfig(todayShift.shift_type);
-    const timeText = (todayShift.start_time && todayShift.end_time) 
-      ? `(${todayShift.start_time.substring(0, 5)} - ${todayShift.end_time.substring(0, 5)})` 
+    const timeText = (todayShift.start_time && todayShift.end_time)
+      ? `(${todayShift.start_time.substring(0, 5)} - ${todayShift.end_time.substring(0, 5)})`
       : '';
 
     return (
       <View style={styles.todayShiftContainer}>
-         <MaterialCommunityIcons name={config.icon} size={16} color={colors.white} />
-         <Text style={styles.todayShiftText}>Hoy: {config.label} {timeText}</Text>
+        <MaterialCommunityIcons name={config.icon} size={16} color={colors.white} />
+        <Text style={styles.todayShiftText}>Hoy: {config.label} {timeText}</Text>
       </View>
     );
   };
-  
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <View style={styles.home}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Inicio</Text>
-        {renderTodayShift()}
+        <SafeAreaView edges={['top']}>
+          <Text style={styles.headerTitle}>Inicio</Text>
+          {renderTodayShift()}
+        </SafeAreaView>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -186,18 +188,20 @@ export default function HomeScreen({ navigation }) {
           />
         )}
       </ScrollView>
-    </SafeAreaView>
+
+    </View>
+
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  home: {
     flex: 1,
     backgroundColor: colors.background,
   },
   header: {
     backgroundColor: colors.primary,
-    paddingVertical: 25,
+    paddingBottom: 25,
     paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -215,6 +219,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     color: colors.white,
     marginBottom: 8,
+    textAlign: "center"
   },
   todayShiftContainer: {
     flexDirection: 'row',
