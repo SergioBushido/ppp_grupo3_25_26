@@ -33,7 +33,7 @@ LocaleConfig.defaultLocale = 'es';
 import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations, requestVacation, cancelVacation, reactiveVacation, deleteVacation } from '../database/vacationService';
 import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee, resetEmployeePassword } from '../database/employeeService';
 import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts, updateShift, getShiftsByEmployee } from '../database/shiftService';
-import { getRecentAttendances, invalidateAttendanceByAdmin } from '../database/attendanceService';
+import { createManualAttendanceByAdmin, getRecentAttendances, invalidateAttendanceByAdmin } from '../database/attendanceService';
 import { createWorkCenter, deleteWorkCenter, getAllWorkCenters, updateWorkCenter } from '../database/workCenterService';
 import { VacationCard } from '../components/VacationCard';
 import { ShiftBadge } from '../components/ShiftBadge';
@@ -86,6 +86,12 @@ export default function AdminScreen() {
   const [attendanceUsesRecentFallback, setAttendanceUsesRecentFallback] = useState(false);
   const [selectedAttendanceLocation, setSelectedAttendanceLocation] = useState(null);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
+  const [manualAttendanceModalVisible, setManualAttendanceModalVisible] = useState(false);
+  const [manualAttendanceEmployeeId, setManualAttendanceEmployeeId] = useState(null);
+  const [manualAttendanceType, setManualAttendanceType] = useState('in');
+  const [manualAttendanceTime, setManualAttendanceTime] = useState('');
+  const [manualAttendanceNote, setManualAttendanceNote] = useState('');
+  const [manualAttendanceLoading, setManualAttendanceLoading] = useState(false);
   const [attendanceActionModalVisible, setAttendanceActionModalVisible] = useState(false);
   const [selectedAttendanceAction, setSelectedAttendanceAction] = useState(null);
   const [attendanceActionReason, setAttendanceActionReason] = useState('');
@@ -275,6 +281,35 @@ export default function AdminScreen() {
     setAttendanceActionModalVisible(true);
   }, []);
 
+  const getDefaultManualAttendanceTime = useCallback(() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  }, []);
+
+  const handleOpenManualAttendanceModal = useCallback(() => {
+    setManualAttendanceEmployeeId(null);
+    setManualAttendanceType('in');
+    setManualAttendanceTime(getDefaultManualAttendanceTime());
+    setManualAttendanceNote('');
+    setManualAttendanceModalVisible(true);
+  }, [getDefaultManualAttendanceTime]);
+
+  const buildManualAttendanceTimestamp = useCallback((date, timeText) => {
+    const trimmed = timeText.trim();
+    if (!/^\d{2}:\d{2}$/.test(trimmed)) {
+      throw new Error('La hora debe tener formato HH:mm.');
+    }
+
+    const [hours, minutes] = trimmed.split(':').map(Number);
+    if (hours > 23 || minutes > 59) {
+      throw new Error('La hora manual indicada no es valida.');
+    }
+
+    const nextTimestamp = new Date(date);
+    nextTimestamp.setHours(hours, minutes, 0, 0);
+    return nextTimestamp;
+  }, []);
+
   const handleOpenAttendanceLocationInMaps = useCallback(async () => {
     if (!selectedAttendanceLocation || !hasAttendanceCoordinates(selectedAttendanceLocation)) {
       return;
@@ -409,6 +444,41 @@ export default function AdminScreen() {
       setAttendanceActionLoading(false);
     }
   }, [attendanceActionReason, loadDayAttendances, selectedAttendanceAction, user]);
+
+  const handleCreateManualAttendance = useCallback(async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'No se ha identificado al administrador actual.');
+      return;
+    }
+
+    if (!manualAttendanceEmployeeId) {
+      Alert.alert('Error', 'Debes seleccionar un empleado.');
+      return;
+    }
+
+    try {
+      setManualAttendanceLoading(true);
+      const timestamp = buildManualAttendanceTimestamp(attendanceDate, manualAttendanceTime);
+      await createManualAttendanceByAdmin({
+        adminEmployeeId: user.id,
+        employeeId: manualAttendanceEmployeeId,
+        type: manualAttendanceType,
+        timestamp,
+        note: manualAttendanceNote,
+      });
+      await loadDayAttendances();
+      setManualAttendanceModalVisible(false);
+      setManualAttendanceEmployeeId(null);
+      setManualAttendanceType('in');
+      setManualAttendanceTime(getDefaultManualAttendanceTime());
+      setManualAttendanceNote('');
+      Alert.alert('Fichaje creado', 'El fichaje manual se ha registrado correctamente.');
+    } catch (error) {
+      Alert.alert('Error', error.message || 'No se pudo registrar el fichaje manual.');
+    } finally {
+      setManualAttendanceLoading(false);
+    }
+  }, [attendanceDate, buildManualAttendanceTimestamp, getDefaultManualAttendanceTime, loadDayAttendances, manualAttendanceEmployeeId, manualAttendanceNote, manualAttendanceTime, manualAttendanceType, user]);
 
   useEffect(() => {
     if (activeTab === 'attendances') {
@@ -1168,6 +1238,14 @@ export default function AdminScreen() {
                 </Animated.View>
               </View>
 
+              <TouchableOpacity
+                style={[styles.batchBtn, styles.manualAttendanceBtn]}
+                onPress={handleOpenManualAttendanceModal}
+              >
+                <MaterialCommunityIcons name="clipboard-plus-outline" size={16} color={colors.primary} />
+                <Text style={styles.batchBtnText}>Registrar fichaje manual</Text>
+              </TouchableOpacity>
+
               {filteredAttendances.length === 0 ? (
                 <View style={styles.empty}>
                   <MaterialCommunityIcons name="clipboard-list" size={40} color={colors.textMuted} />
@@ -1182,6 +1260,12 @@ export default function AdminScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontWeight: typography.weights.bold }}>{item.employee_name}</Text>
                         <Text style={{ color: colors.textMuted }}>{format(parseISO(item.timestamp), "HH:mm:ss")}</Text>
+                        {item.entry_mode === 'admin_manual' && (
+                          <View style={styles.manualAttendanceBadge}>
+                            <MaterialCommunityIcons name="account-hard-hat-outline" size={14} color={colors.primary} />
+                            <Text style={styles.manualAttendanceBadgeText}>Creado por administracion</Text>
+                          </View>
+                        )}
                         {item.record_status === 'voided' && (
                           <View style={styles.voidedBadge}>
                             <MaterialCommunityIcons name="shield-remove-outline" size={14} color={colors.rejected} />
@@ -1199,6 +1283,9 @@ export default function AdminScreen() {
                         )}
                         {item.record_status === 'voided' && item.void_reason && (
                           <Text style={styles.voidedReasonText}>Motivo: {item.void_reason}</Text>
+                        )}
+                        {item.entry_mode === 'admin_manual' && item.admin_note && (
+                          <Text style={styles.manualAttendanceNoteText}>Nota admin: {item.admin_note}</Text>
                         )}
                         {hasAttendanceCoordinates(item) && (
                           <TouchableOpacity
@@ -1294,6 +1381,128 @@ export default function AdminScreen() {
                     <Text style={styles.modalConfirmText}>Abrir en Maps</Text>
                   </TouchableOpacity>
                 </View>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            transparent
+            visible={manualAttendanceModalVisible}
+            animationType="fade"
+            onRequestClose={() => setManualAttendanceModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modal, styles.editEmployeeModal]}>
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={styles.editEmployeeModalContent}
+                >
+                  <Text style={styles.modalTitle}>Registrar fichaje manual</Text>
+                  <Text style={styles.modalSubtitle}>
+                    {format(attendanceDate, "EEEE, d 'de' MMMM", { locale: es }).replace(/^\w/, c => c.toUpperCase())}
+                  </Text>
+
+                  <View style={styles.inlineInfoCard}>
+                    <Text style={styles.inlineInfoText}>
+                      Usa esta accion cuando el empleado no pueda fichar desde la app. La secuencia diaria se valida antes de guardar.
+                    </Text>
+                  </View>
+
+                  <Text style={styles.modalLabel}>Empleado</Text>
+                  <ScrollView style={styles.manualAttendanceEmployeeList} showsVerticalScrollIndicator={false}>
+                    {employees.map((employee) => (
+                      <TouchableOpacity
+                        key={employee.id}
+                        style={[
+                          styles.empOption,
+                          manualAttendanceEmployeeId === employee.id && styles.empOptionSelected,
+                        ]}
+                        onPress={() => setManualAttendanceEmployeeId(employee.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.empOptionText,
+                            manualAttendanceEmployeeId === employee.id && styles.empOptionTextSelected,
+                          ]}
+                        >
+                          {employee.name}
+                        </Text>
+                        {employee.attendance_policy === 'manual_only' && (
+                          <Text style={styles.manualOnlyHint}>Solo manual</Text>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  <Text style={styles.modalLabel}>Tipo</Text>
+                  <View style={styles.shiftOptions}>
+                    <TouchableOpacity
+                      style={[styles.shiftOption, manualAttendanceType === 'in' && styles.shiftOptionSelected]}
+                      onPress={() => setManualAttendanceType('in')}
+                    >
+                      <MaterialCommunityIcons
+                        name="login"
+                        size={18}
+                        color={manualAttendanceType === 'in' ? colors.white : colors.morning}
+                      />
+                      <Text style={[styles.shiftOptionText, manualAttendanceType === 'in' && styles.shiftOptionTextSelected]}>
+                        Entrada
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.shiftOption, manualAttendanceType === 'out' && styles.shiftOptionSelected]}
+                      onPress={() => setManualAttendanceType('out')}
+                    >
+                      <MaterialCommunityIcons
+                        name="logout"
+                        size={18}
+                        color={manualAttendanceType === 'out' ? colors.white : colors.night}
+                      />
+                      <Text style={[styles.shiftOptionText, manualAttendanceType === 'out' && styles.shiftOptionTextSelected]}>
+                        Salida
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={styles.modalLabel}>Hora (HH:mm)</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={manualAttendanceTime}
+                    onChangeText={setManualAttendanceTime}
+                    placeholder="09:00"
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
+                  />
+
+                  <Text style={styles.modalLabel}>Nota administrativa opcional</Text>
+                  <TextInput
+                    style={[styles.formInput, styles.attendanceReasonInput]}
+                    value={manualAttendanceNote}
+                    onChangeText={setManualAttendanceNote}
+                    placeholder="Ej. olvido de fichaje, incidencia operativa, ajuste validado..."
+                    multiline
+                    textAlignVertical="top"
+                    maxLength={180}
+                  />
+
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity
+                      style={styles.modalCancelBtn}
+                      onPress={() => setManualAttendanceModalVisible(false)}
+                    >
+                      <Text style={styles.modalCancelText}>Cancelar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalConfirmBtn, manualAttendanceLoading && styles.modalConfirmBtnDisabled]}
+                      onPress={handleCreateManualAttendance}
+                      disabled={manualAttendanceLoading}
+                    >
+                      <Text style={styles.modalConfirmText}>
+                        {manualAttendanceLoading ? 'Guardando...' : 'Guardar'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
               </View>
             </View>
           </Modal>
@@ -2148,6 +2357,27 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
+  manualAttendanceBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: colors.background,
+  },
+  manualAttendanceBadgeText: {
+    color: colors.primary,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+  },
+  manualAttendanceNoteText: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.xs,
+    marginTop: 6,
+  },
   voidedBadge: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -2200,6 +2430,9 @@ const styles = StyleSheet.create({
     color: colors.rejected,
     fontSize: typography.sizes.xs,
     fontWeight: typography.weights.bold,
+  },
+  manualAttendanceBtn: {
+    marginBottom: 16,
   },
   centerListCard: {
     backgroundColor: colors.white,
@@ -2461,6 +2694,16 @@ const styles = StyleSheet.create({
   attendanceReasonInput: {
     minHeight: 96,
     paddingTop: 12,
+  },
+  manualAttendanceEmployeeList: {
+    maxHeight: 180,
+    marginBottom: 16,
+  },
+  manualOnlyHint: {
+    marginTop: 4,
+    color: colors.primary,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
   },
   deleteLink: {
     flexDirection: 'row',
