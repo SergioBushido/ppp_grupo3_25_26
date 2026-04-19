@@ -110,7 +110,9 @@ export default function HomeScreen({ navigation }) {
               await loadHomeData();
               Alert.alert('Éxito', `${actionName} registrada correctamente.`);
             } catch (error) {
-              console.error(error);
+              if (__DEV__ && error?.message !== 'Tu fichaje debe registrarse manualmente por administracion.') {
+                console.error(error);
+              }
               Alert.alert('Error', error.message || 'Error al registrar el fichaje.');
               setIsLoading(false);
             }
