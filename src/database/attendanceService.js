@@ -3,22 +3,76 @@ import { getEmployeeById } from './employeeService';
 import { getWorkCenterById } from './workCenterService';
 import { calculateDistanceMeters } from '../lib/locationService';
 
-export async function getTodayAttendance(employeeId) {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
+function isMissingAttendanceAuditColumn(error) {
+  return error?.code === '42703' && error?.message?.includes('record_status');
+}
 
+function normalizeAttendanceRecord(record) {
+  return {
+    record_status: 'active',
+    voided_at: null,
+    voided_by_employee_id: null,
+    void_reason: null,
+    ...record,
+  };
+}
+
+function buildLocalDayBounds(date) {
+  if (typeof date === 'string') {
+    return {
+      dayStart: new Date(`${date}T00:00:00`),
+      dayEnd: new Date(`${date}T23:59:59.999`),
+    };
+  }
+
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(date);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  return { dayStart, dayEnd };
+}
+
+async function getAttendanceById(attendanceId) {
   const { data, error } = await supabase
     .from('attendances')
     .select('*')
+    .eq('id', attendanceId)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getTodayAttendance(employeeId) {
+  const { dayStart: todayStart, dayEnd: todayEnd } = buildLocalDayBounds(new Date());
+
+  const activeQuery = supabase
+    .from('attendances')
+    .select('*')
     .eq('employee_id', employeeId)
+    .eq('record_status', 'active')
     .gte('timestamp', todayStart.toISOString())
     .lte('timestamp', todayEnd.toISOString())
     .order('timestamp', { ascending: true });
 
+  const { data, error } = await activeQuery;
+
+  if (isMissingAttendanceAuditColumn(error)) {
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('attendances')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .gte('timestamp', todayStart.toISOString())
+      .lte('timestamp', todayEnd.toISOString())
+      .order('timestamp', { ascending: true });
+
+    if (fallbackError) throw fallbackError;
+    return (fallbackData || []).map(normalizeAttendanceRecord);
+  }
+
   if (error) throw error;
-  return data;
+  return (data || []).map(normalizeAttendanceRecord);
 }
 
 export async function registerAttendance(employeeId, type) {
@@ -132,25 +186,101 @@ export async function registerAttendanceWithLocation({ employee, type, location 
 }
 
 export async function getAllAttendancesByDate(date) {
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(date);
-  dayEnd.setHours(23, 59, 59, 999);
+  const { dayStart, dayEnd } = buildLocalDayBounds(date);
 
   const { data, error } = await supabase
     .from('attendances')
-    .select(`
-      *,
-      employees ( name )
-    `)
+    .select('*')
     .gte('timestamp', dayStart.toISOString())
     .lte('timestamp', dayEnd.toISOString())
     .order('timestamp', { ascending: true });
 
   if (error) throw error;
 
-  return data.map(record => ({
-    ...record,
-    employee_name: record.employees?.name
+  return (data || []).map(record => ({
+    ...normalizeAttendanceRecord(record),
   }));
+}
+
+export async function getRecentAttendances(limit = 50) {
+  const { data, error } = await supabase
+    .from('attendances')
+    .select('*')
+    .order('timestamp', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  return (data || []).map((record) => ({
+    ...normalizeAttendanceRecord(record),
+  }));
+}
+
+export async function invalidateAttendanceByAdmin(attendanceId, { adminEmployeeId, reason }) {
+  const normalizedReason = reason?.trim();
+  if (!normalizedReason) {
+    throw new Error('Debes indicar un motivo para anular el fichaje.');
+  }
+
+  if (!adminEmployeeId) {
+    throw new Error('No se ha identificado al administrador que realiza la accion.');
+  }
+
+  const attendance = await getAttendanceById(attendanceId);
+
+  if (attendance.record_status == null) {
+    throw new Error('Debes aplicar la migracion de control auditado de fichajes antes de usar esta accion.');
+  }
+
+  if (attendance.record_status === 'voided') {
+    throw new Error('Este fichaje ya estaba anulado.');
+  }
+
+  const attendanceDate = new Date(attendance.timestamp);
+  const dayStart = new Date(attendanceDate);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(attendanceDate);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const { data: latestActiveRecord, error: latestError } = await supabase
+    .from('attendances')
+    .select('id')
+    .eq('employee_id', attendance.employee_id)
+    .eq('record_status', 'active')
+    .gte('timestamp', dayStart.toISOString())
+    .lte('timestamp', dayEnd.toISOString())
+    .order('timestamp', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (isMissingAttendanceAuditColumn(latestError)) {
+    throw new Error('Debes aplicar la migracion de control auditado de fichajes antes de usar esta accion.');
+  }
+
+  if (latestError) throw latestError;
+
+  if (!latestActiveRecord || latestActiveRecord.id !== attendance.id) {
+    throw new Error('Solo se puede anular el ultimo fichaje activo del empleado en ese dia.');
+  }
+
+  const { data, error } = await supabase
+    .from('attendances')
+    .update({
+      record_status: 'voided',
+      voided_at: new Date().toISOString(),
+      voided_by_employee_id: adminEmployeeId,
+      void_reason: normalizedReason,
+    })
+    .eq('id', attendanceId)
+    .eq('record_status', 'active')
+    .select()
+    .single();
+
+  if (isMissingAttendanceAuditColumn(error)) {
+    throw new Error('Debes aplicar la migracion de control auditado de fichajes antes de usar esta accion.');
+  }
+
+  if (error) throw error;
+  return normalizeAttendanceRecord(data);
 }

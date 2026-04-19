@@ -33,6 +33,8 @@ La aplicación utiliza **Supabase** como backend en la nube, lo que permite la s
 - **Política por empleado:** El administrador puede configurar fichaje libre (`anywhere`), validado por centro (`assigned_center`) o solo manual (`manual_only`).
 - **Centros de trabajo:** Se pueden definir centros con nombre, dirección, coordenadas y radio permitido en metros.
 - **Trazabilidad:** Cada fichaje puede guardar coordenadas, precisión GPS, centro validado y estado de validación para auditoría desde el panel admin.
+- **Corrección auditada:** El administrador puede anular el último fichaje activo del día de un empleado indicando un motivo, sin borrar físicamente el registro.
+- **Nota operativa:** Durante la implantación de la anulación auditada se detectó que el monitor admin podía quedarse vacío si el entorno no tenía aplicada la migración nueva o si la vista dependía de filtros diarios/joins frágiles. La solución final estabiliza la carga con compatibilidad temporal sin `record_status`, lectura directa de `attendances` y resolución del nombre del empleado desde los datos ya cargados en administración.
 
 ## 🛠️ Stack Tecnológico
 
