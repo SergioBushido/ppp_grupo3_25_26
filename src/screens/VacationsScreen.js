@@ -24,9 +24,15 @@ export default function VacationsScreen({ navigation }) {
 
   const loadVacations = useCallback(async () => {
     setLoading(true);
-    const data = await getVacationsByEmployee(user.id);
-    setVacations(data);
-    setLoading(false);
+    try {
+      const data = await getVacationsByEmployee(user.id);
+      setVacations(data);
+    } catch (e) {
+      console.error('[Vacations] Error al cargar vacaciones:', e);
+      Alert.alert('Error', 'No se pudieron cargar las vacaciones. Inténtalo de nuevo.');
+    } finally {
+      setLoading(false);
+    }
   }, [user.id]);
 
   useEffect(() => {

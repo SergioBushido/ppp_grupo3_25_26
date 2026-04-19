@@ -12,20 +12,11 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, addDays, differenceInCalendarDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar, LocaleConfig } from 'react-native-calendars';
+import { Calendar } from 'react-native-calendars';
 import { useAuth } from '../context/AuthContext';
 import { requestVacation } from '../database/vacationService';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
-
-LocaleConfig.locales['es'] = {
-  monthNames: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
-  monthNamesShort: ['Ene.', 'Feb.', 'Mar', 'Abr', 'May', 'Jun', 'Jul.', 'Ago', 'Sept.', 'Oct.', 'Nov.', 'Dic.'],
-  dayNames: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
-  dayNamesShort: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
-  today: 'Hoy'
-};
-LocaleConfig.defaultLocale = 'es';
 
 export default function RequestVacationScreen({ navigation }) {
   const { user, refreshUser } = useAuth();
@@ -163,7 +154,7 @@ export default function RequestVacationScreen({ navigation }) {
             <Text style={{fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold}}>
               {format(startDate, "d MMM", { locale: es })}
             </Text>
-            {startDate && endDate && startDate !== endDate && (
+            {startDate && endDate && startDate.getTime() !== endDate.getTime() && (
               <>
                <MaterialCommunityIcons name="arrow-right" size={16} color={colors.textMuted} style={{marginHorizontal: 12}} />
                <Text style={{fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: typography.weights.bold}}>

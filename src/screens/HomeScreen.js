@@ -110,7 +110,9 @@ export default function HomeScreen({ navigation }) {
               await loadHomeData();
               Alert.alert('Éxito', `${actionName} registrada correctamente.`);
             } catch (error) {
-              console.error(error);
+              if (__DEV__ && error?.message !== 'Tu fichaje debe registrarse manualmente por administracion.') {
+                console.error(error);
+              }
               Alert.alert('Error', error.message || 'Error al registrar el fichaje.');
               setIsLoading(false);
             }
@@ -123,6 +125,9 @@ export default function HomeScreen({ navigation }) {
   const getFichajeState = () => {
     if (isLoading || !attendanceRecords) {
       return { title: 'Cargando...', icon: 'clock-outline', gradient: colors.uiGradients.action };
+    }
+    if (user?.attendance_policy === 'manual_only') {
+      return { title: 'Fichaje Manual', icon: 'clipboard-account-outline', gradient: ['#64748B', '#475569'] };
     }
     const hasIn = attendanceRecords.some(r => r.type === 'in');
     const hasOut = attendanceRecords.some(r => r.type === 'out');

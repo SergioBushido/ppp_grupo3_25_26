@@ -18,21 +18,13 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, addDays, startOfMonth, endOfMonth, subMonths, addMonths, parseISO, differenceInCalendarDays, startOfWeek, endOfWeek, subWeeks, addWeeks, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar, LocaleConfig } from 'react-native-calendars';
+import { Calendar } from 'react-native-calendars';
 import { useFocusEffect } from '@react-navigation/native'
-
-LocaleConfig.locales['es'] = {
-  monthNames: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
-  monthNamesShort: ['Ene.', 'Feb.', 'Mar', 'Abr', 'May', 'Jun', 'Jul.', 'Ago', 'Sept.', 'Oct.', 'Nov.', 'Dic.'],
-  dayNames: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
-  dayNamesShort: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
-  today: 'Hoy'
-};
-LocaleConfig.defaultLocale = 'es';
+import { useAuth } from '../context/AuthContext';
 import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations, requestVacation, cancelVacation, reactiveVacation, deleteVacation } from '../database/vacationService';
 import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee, resetEmployeePassword } from '../database/employeeService';
-import { getShiftsByDate, createShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts, updateShift, getShiftsByEmployee } from '../database/shiftService';
-import { getAllAttendancesByDate } from '../database/attendanceService';
+import { getShiftsByDate, createShift, deleteShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts, updateShift, getShiftsByEmployee } from '../database/shiftService';
+import { createManualAttendanceByAdmin, getRecentAttendances, invalidateAttendanceByAdmin } from '../database/attendanceService';
 import { createWorkCenter, deleteWorkCenter, getAllWorkCenters, updateWorkCenter } from '../database/workCenterService';
 import { VacationCard } from '../components/VacationCard';
 import { ShiftBadge } from '../components/ShiftBadge';
@@ -62,6 +54,7 @@ const ATTENDANCE_POLICIES = [
 ];
 
 export default function AdminScreen() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('requests');
   const [pendingVacations, setPendingVacations] = useState([]);
   const [allVacations, setAllVacations] = useState([]);
@@ -81,8 +74,19 @@ export default function AdminScreen() {
   // Attendances monitoring
   const [attendanceDate, setAttendanceDate] = useState(new Date());
   const [dayAttendances, setDayAttendances] = useState([]);
+  const [attendanceUsesRecentFallback, setAttendanceUsesRecentFallback] = useState(false);
   const [selectedAttendanceLocation, setSelectedAttendanceLocation] = useState(null);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
+  const [manualAttendanceModalVisible, setManualAttendanceModalVisible] = useState(false);
+  const [manualAttendanceEmployeeId, setManualAttendanceEmployeeId] = useState(null);
+  const [manualAttendanceType, setManualAttendanceType] = useState('in');
+  const [manualAttendanceTime, setManualAttendanceTime] = useState('');
+  const [manualAttendanceNote, setManualAttendanceNote] = useState('');
+  const [manualAttendanceLoading, setManualAttendanceLoading] = useState(false);
+  const [attendanceActionModalVisible, setAttendanceActionModalVisible] = useState(false);
+  const [selectedAttendanceAction, setSelectedAttendanceAction] = useState(null);
+  const [attendanceActionReason, setAttendanceActionReason] = useState('');
+  const [attendanceActionLoading, setAttendanceActionLoading] = useState(false);
   const [activeBrush, setActiveBrush] = useState('morning');
   const [copyModalVisible, setCopyModalVisible] = useState(false);
   const [copySummary, setCopySummary] = useState({ shifts: [], conflicts: [], sourceRange: '', targetRange: '' });
@@ -166,32 +170,7 @@ export default function AdminScreen() {
   // Estado para exportación PDF
   const [exportandoPDF, setExportandoPDF] = useState(false);
 
-  // Construye la matriz mensual para el PDF (usa estados locales)
-  const construirMatrizPDF = () => {
-    const year = reportMonth.getFullYear();
-    const month = reportMonth.getMonth() + 1;
-    const diasMes = new Date(year, month, 0).getDate();
-    return employees.map(emp => {
-      const turnos = [];
-      const empShifts = reportData.find(e => e.id === emp.id)?.shifts || [];
-      for (let d = 1; d <= diasMes; d++) {
-        const turno = empShifts.find(t => Number(t.dia) === d);
-        if (turno) {
-          let tipo = '';
-          if (turno.shift_type === 'morning') tipo = 'M';
-          else if (turno.shift_type === 'afternoon') tipo = 'T';
-          else if (turno.shift_type === 'night') tipo = 'N';
-          turnos.push({ dia: d, tipo });
-        }
-      }
-      const vacaciones = [];
-      const empVac = reportData.find(e => e.id === emp.id)?.vacacionesDias || [];
-      for (let d = 1; d <= diasMes; d++) {
-        if (empVac.includes(d)) vacaciones.push({ dia: d });
-      }
-      return { nombre: emp.name, turnos, vacaciones };
-    });
-  };
+
 
   // Exportar PDF detallado
   const handleExportarPDF = async () => {
@@ -262,6 +241,41 @@ export default function AdminScreen() {
     setLocationModalVisible(true);
   }, [hasAttendanceCoordinates]);
 
+  const handleOpenAttendanceAction = useCallback((attendance) => {
+    setSelectedAttendanceAction(attendance);
+    setAttendanceActionReason('');
+    setAttendanceActionModalVisible(true);
+  }, []);
+
+  const getDefaultManualAttendanceTime = useCallback(() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  }, []);
+
+  const handleOpenManualAttendanceModal = useCallback(() => {
+    setManualAttendanceEmployeeId(null);
+    setManualAttendanceType('in');
+    setManualAttendanceTime(getDefaultManualAttendanceTime());
+    setManualAttendanceNote('');
+    setManualAttendanceModalVisible(true);
+  }, [getDefaultManualAttendanceTime]);
+
+  const buildManualAttendanceTimestamp = useCallback((date, timeText) => {
+    const trimmed = timeText.trim();
+    if (!/^\d{2}:\d{2}$/.test(trimmed)) {
+      throw new Error('La hora debe tener formato HH:mm.');
+    }
+
+    const [hours, minutes] = trimmed.split(':').map(Number);
+    if (hours > 23 || minutes > 59) {
+      throw new Error('La hora manual indicada no es valida.');
+    }
+
+    const nextTimestamp = new Date(date);
+    nextTimestamp.setHours(hours, minutes, 0, 0);
+    return nextTimestamp;
+  }, []);
+
   const handleOpenAttendanceLocationInMaps = useCallback(async () => {
     if (!selectedAttendanceLocation || !hasAttendanceCoordinates(selectedAttendanceLocation)) {
       return;
@@ -327,21 +341,110 @@ export default function AdminScreen() {
 
   const loadDayAttendances = useCallback(async () => {
     const dateStr = format(attendanceDate, 'yyyy-MM-dd');
-    const records = await getAllAttendancesByDate(dateStr);
+    const recentRecords = await getRecentAttendances(200);
+    let records = recentRecords.filter((record) => (
+      format(parseISO(record.timestamp), 'yyyy-MM-dd') === dateStr
+    ));
+    let usedRecentFallback = false;
+
+    if (records.length === 0) {
+      records = recentRecords;
+      usedRecentFallback = records.length > 0;
+    }
     
+    const activeRecords = [...records]
+      .filter((record) => record.record_status !== 'voided')
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
     // Identify active employees (who have an 'in' but no 'out' yet)
     const empStatus = {};
-    records.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(r => {
+    const latestActiveByEmployee = {};
+    activeRecords.forEach(r => {
       empStatus[r.employee_id] = r.type;
+      latestActiveByEmployee[r.employee_id] = r.id;
     });
     
     const enrichedRecords = records.map(r => ({
       ...r,
-      isActive: empStatus[r.employee_id] === 'in' && format(new Date(), 'yyyy-MM-dd') === dateStr
+      employee_name: employees.find((employee) => employee.id === r.employee_id)?.name || `Empleado #${r.employee_id}`,
+      isActive: r.record_status !== 'voided' && empStatus[r.employee_id] === 'in' && format(new Date(), 'yyyy-MM-dd') === dateStr,
+      canInvalidate: r.record_status !== 'voided' && latestActiveByEmployee[r.employee_id] === r.id,
     }));
 
     setDayAttendances(enrichedRecords);
-  }, [attendanceDate]);
+    setAttendanceUsesRecentFallback(usedRecentFallback);
+  }, [attendanceDate, employees]);
+
+  const handleInvalidateAttendance = useCallback(async () => {
+    const trimmedReason = attendanceActionReason.trim();
+
+    if (!selectedAttendanceAction?.id) {
+      Alert.alert('Error', 'No se ha seleccionado ningun fichaje.');
+      return;
+    }
+
+    if (!trimmedReason) {
+      Alert.alert('Error', 'Debes indicar un motivo para anular el fichaje.');
+      return;
+    }
+
+    if (!user?.id) {
+      Alert.alert('Error', 'No se ha identificado al administrador actual.');
+      return;
+    }
+
+    try {
+      setAttendanceActionLoading(true);
+      await invalidateAttendanceByAdmin(selectedAttendanceAction.id, {
+        adminEmployeeId: user.id,
+        reason: trimmedReason,
+      });
+      await loadDayAttendances();
+      setAttendanceActionModalVisible(false);
+      setSelectedAttendanceAction(null);
+      setAttendanceActionReason('');
+      Alert.alert('Fichaje anulado', 'El fichaje ha quedado anulado con trazabilidad de administracion.');
+    } catch (error) {
+      Alert.alert('Error', error.message || 'No se pudo anular el fichaje.');
+    } finally {
+      setAttendanceActionLoading(false);
+    }
+  }, [attendanceActionReason, loadDayAttendances, selectedAttendanceAction, user]);
+
+  const handleCreateManualAttendance = useCallback(async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'No se ha identificado al administrador actual.');
+      return;
+    }
+
+    if (!manualAttendanceEmployeeId) {
+      Alert.alert('Error', 'Debes seleccionar un empleado.');
+      return;
+    }
+
+    try {
+      setManualAttendanceLoading(true);
+      const timestamp = buildManualAttendanceTimestamp(attendanceDate, manualAttendanceTime);
+      await createManualAttendanceByAdmin({
+        adminEmployeeId: user.id,
+        employeeId: manualAttendanceEmployeeId,
+        type: manualAttendanceType,
+        timestamp,
+        note: manualAttendanceNote,
+      });
+      await loadDayAttendances();
+      setManualAttendanceModalVisible(false);
+      setManualAttendanceEmployeeId(null);
+      setManualAttendanceType('in');
+      setManualAttendanceTime(getDefaultManualAttendanceTime());
+      setManualAttendanceNote('');
+      Alert.alert('Fichaje creado', 'El fichaje manual se ha registrado correctamente.');
+    } catch (error) {
+      Alert.alert('Error', error.message || 'No se pudo registrar el fichaje manual.');
+    } finally {
+      setManualAttendanceLoading(false);
+    }
+  }, [attendanceDate, buildManualAttendanceTimestamp, getDefaultManualAttendanceTime, loadDayAttendances, manualAttendanceEmployeeId, manualAttendanceNote, manualAttendanceTime, manualAttendanceType, user]);
 
   useEffect(() => {
     if (activeTab === 'attendances') {
@@ -490,9 +593,7 @@ export default function AdminScreen() {
     return days;
   };
 
-  const handleFillAll = (type) => {
-    // Deprecated with interactive calendar, but kept minimal to avoid breaks if referenced.
-  };
+
 
   const handleAddShift = async () => {
     if (!selectedEmp) return;
@@ -590,7 +691,6 @@ export default function AdminScreen() {
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Eliminar', style: 'destructive', onPress: async () => {
-          const { deleteShift } = await import('../database/shiftService');
           await deleteShift(shift.id);
           await loadDayShifts();
         }
@@ -930,12 +1030,6 @@ export default function AdminScreen() {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      loadAll();
-    }, [loadAll])
-  );
-
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -1095,9 +1189,19 @@ export default function AdminScreen() {
                   style={[styles.formInput, { marginBottom: 8 }]}
                 />
                 <Animated.View style={{ transform: [{ scale: pulseAnim }], alignItems: 'center' }}>
-                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>Fichajes del día</Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                    {attendanceUsesRecentFallback ? 'Mostrando ultimos fichajes registrados' : 'Fichajes del día'}
+                  </Text>
                 </Animated.View>
               </View>
+
+              <TouchableOpacity
+                style={[styles.batchBtn, styles.manualAttendanceBtn]}
+                onPress={handleOpenManualAttendanceModal}
+              >
+                <MaterialCommunityIcons name="clipboard-plus-outline" size={16} color={colors.primary} />
+                <Text style={styles.batchBtnText}>Registrar fichaje manual</Text>
+              </TouchableOpacity>
 
               {filteredAttendances.length === 0 ? (
                 <View style={styles.empty}>
@@ -1109,10 +1213,22 @@ export default function AdminScreen() {
                   data={filteredAttendances}
                   keyExtractor={(item) => String(item.id)}
                   renderItem={({ item }) => (
-                    <View style={styles.shiftRow}>
+                    <View style={[styles.shiftRow, item.record_status === 'voided' && styles.voidedAttendanceRow]}>
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontWeight: typography.weights.bold }}>{item.employee_name}</Text>
                         <Text style={{ color: colors.textMuted }}>{format(parseISO(item.timestamp), "HH:mm:ss")}</Text>
+                        {item.entry_mode === 'admin_manual' && (
+                          <View style={styles.manualAttendanceBadge}>
+                            <MaterialCommunityIcons name="account-hard-hat-outline" size={14} color={colors.primary} />
+                            <Text style={styles.manualAttendanceBadgeText}>Creado por administracion</Text>
+                          </View>
+                        )}
+                        {item.record_status === 'voided' && (
+                          <View style={styles.voidedBadge}>
+                            <MaterialCommunityIcons name="shield-remove-outline" size={14} color={colors.rejected} />
+                            <Text style={styles.voidedBadgeText}>Anulado por administracion</Text>
+                          </View>
+                        )}
                         {item.location_status && item.location_status !== 'not_required' && (
                           <Text style={styles.attendanceGeoText}>
                             {item.location_status === 'validated_center'
@@ -1122,6 +1238,12 @@ export default function AdminScreen() {
                                 : 'Ubicacion no disponible'}
                           </Text>
                         )}
+                        {item.record_status === 'voided' && item.void_reason && (
+                          <Text style={styles.voidedReasonText}>Motivo: {item.void_reason}</Text>
+                        )}
+                        {item.entry_mode === 'admin_manual' && item.admin_note && (
+                          <Text style={styles.manualAttendanceNoteText}>Nota admin: {item.admin_note}</Text>
+                        )}
                         {hasAttendanceCoordinates(item) && (
                           <TouchableOpacity
                             style={styles.locationLinkBtn}
@@ -1129,6 +1251,15 @@ export default function AdminScreen() {
                           >
                             <MaterialCommunityIcons name="map-marker-radius-outline" size={16} color={colors.primary} />
                             <Text style={styles.locationLinkText}>Mostrar ubicacion</Text>
+                          </TouchableOpacity>
+                        )}
+                        {item.canInvalidate && (
+                          <TouchableOpacity
+                            style={styles.invalidateAttendanceBtn}
+                            onPress={() => handleOpenAttendanceAction(item)}
+                          >
+                            <MaterialCommunityIcons name="trash-can-outline" size={16} color={colors.rejected} />
+                            <Text style={styles.invalidateAttendanceBtnText}>Anular fichaje</Text>
                           </TouchableOpacity>
                         )}
                       </View>
@@ -1205,6 +1336,183 @@ export default function AdminScreen() {
                     onPress={handleOpenAttendanceLocationInMaps}
                   >
                     <Text style={styles.modalConfirmText}>Abrir en Maps</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            transparent
+            visible={manualAttendanceModalVisible}
+            animationType="fade"
+            onRequestClose={() => setManualAttendanceModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modal, styles.editEmployeeModal]}>
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={styles.editEmployeeModalContent}
+                >
+                  <Text style={styles.modalTitle}>Registrar fichaje manual</Text>
+                  <Text style={styles.modalSubtitle}>
+                    {format(attendanceDate, "EEEE, d 'de' MMMM", { locale: es }).replace(/^\w/, c => c.toUpperCase())}
+                  </Text>
+
+                  <View style={styles.inlineInfoCard}>
+                    <Text style={styles.inlineInfoText}>
+                      Usa esta accion cuando el empleado no pueda fichar desde la app. La secuencia diaria se valida antes de guardar.
+                    </Text>
+                  </View>
+
+                  <Text style={styles.modalLabel}>Empleado</Text>
+                  <ScrollView style={styles.manualAttendanceEmployeeList} showsVerticalScrollIndicator={false}>
+                    {employees.map((employee) => (
+                      <TouchableOpacity
+                        key={employee.id}
+                        style={[
+                          styles.empOption,
+                          manualAttendanceEmployeeId === employee.id && styles.empOptionSelected,
+                        ]}
+                        onPress={() => setManualAttendanceEmployeeId(employee.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.empOptionText,
+                            manualAttendanceEmployeeId === employee.id && styles.empOptionTextSelected,
+                          ]}
+                        >
+                          {employee.name}
+                        </Text>
+                        {employee.attendance_policy === 'manual_only' && (
+                          <Text style={styles.manualOnlyHint}>Solo manual</Text>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  <Text style={styles.modalLabel}>Tipo</Text>
+                  <View style={styles.shiftOptions}>
+                    <TouchableOpacity
+                      style={[styles.shiftOption, manualAttendanceType === 'in' && styles.shiftOptionSelected]}
+                      onPress={() => setManualAttendanceType('in')}
+                    >
+                      <MaterialCommunityIcons
+                        name="login"
+                        size={18}
+                        color={manualAttendanceType === 'in' ? colors.white : colors.morning}
+                      />
+                      <Text style={[styles.shiftOptionText, manualAttendanceType === 'in' && styles.shiftOptionTextSelected]}>
+                        Entrada
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.shiftOption, manualAttendanceType === 'out' && styles.shiftOptionSelected]}
+                      onPress={() => setManualAttendanceType('out')}
+                    >
+                      <MaterialCommunityIcons
+                        name="logout"
+                        size={18}
+                        color={manualAttendanceType === 'out' ? colors.white : colors.night}
+                      />
+                      <Text style={[styles.shiftOptionText, manualAttendanceType === 'out' && styles.shiftOptionTextSelected]}>
+                        Salida
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={styles.modalLabel}>Hora (HH:mm)</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={manualAttendanceTime}
+                    onChangeText={setManualAttendanceTime}
+                    placeholder="09:00"
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
+                  />
+
+                  <Text style={styles.modalLabel}>Nota administrativa opcional</Text>
+                  <TextInput
+                    style={[styles.formInput, styles.attendanceReasonInput]}
+                    value={manualAttendanceNote}
+                    onChangeText={setManualAttendanceNote}
+                    placeholder="Ej. olvido de fichaje, incidencia operativa, ajuste validado..."
+                    multiline
+                    textAlignVertical="top"
+                    maxLength={180}
+                  />
+
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity
+                      style={styles.modalCancelBtn}
+                      onPress={() => setManualAttendanceModalVisible(false)}
+                    >
+                      <Text style={styles.modalCancelText}>Cancelar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalConfirmBtn, manualAttendanceLoading && styles.modalConfirmBtnDisabled]}
+                      onPress={handleCreateManualAttendance}
+                      disabled={manualAttendanceLoading}
+                    >
+                      <Text style={styles.modalConfirmText}>
+                        {manualAttendanceLoading ? 'Guardando...' : 'Guardar'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            transparent
+            visible={attendanceActionModalVisible}
+            animationType="fade"
+            onRequestClose={() => setAttendanceActionModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modal}>
+                <Text style={styles.modalTitle}>Anular fichaje</Text>
+                <Text style={styles.modalSubtitle}>
+                  {selectedAttendanceAction?.employee_name || 'Empleado'} · {selectedAttendanceAction?.type === 'in' ? 'Entrada' : 'Salida'}
+                </Text>
+
+                <View style={styles.inlineInfoCard}>
+                  <Text style={styles.inlineInfoText}>
+                    Esta accion no borra el registro fisicamente. Lo marca como anulado y deja trazabilidad de administracion.
+                  </Text>
+                </View>
+
+                <Text style={styles.modalLabel}>Motivo</Text>
+                <TextInput
+                  style={[styles.formInput, styles.attendanceReasonInput]}
+                  value={attendanceActionReason}
+                  onChangeText={setAttendanceActionReason}
+                  placeholder="Ej. fichaje duplicado, error operativo, correccion solicitada..."
+                  multiline
+                  textAlignVertical="top"
+                  maxLength={180}
+                />
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.modalCancelBtn}
+                    onPress={() => {
+                      setAttendanceActionModalVisible(false);
+                      setSelectedAttendanceAction(null);
+                      setAttendanceActionReason('');
+                    }}
+                  >
+                    <Text style={styles.modalCancelText}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalConfirmBtn, attendanceActionLoading && styles.modalConfirmBtnDisabled]}
+                    onPress={handleInvalidateAttendance}
+                    disabled={attendanceActionLoading}
+                  >
+                    <Text style={styles.modalConfirmText}>
+                      {attendanceActionLoading ? 'Anulando...' : 'Confirmar'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1312,6 +1620,21 @@ export default function AdminScreen() {
                   <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
                 </TouchableOpacity>
               </View>
+
+              <TouchableOpacity
+                style={[styles.batchBtn, styles.reportExportBtn, exportandoPDF && styles.modalConfirmBtnDisabled]}
+                onPress={handleExportarPDF}
+                disabled={exportandoPDF}
+              >
+                <MaterialCommunityIcons
+                  name={exportandoPDF ? 'loading' : 'file-pdf-box'}
+                  size={18}
+                  color={colors.primary}
+                />
+                <Text style={styles.batchBtnText}>
+                  {exportandoPDF ? 'Generando PDF...' : 'Exportar PDF'}
+                </Text>
+              </TouchableOpacity>
 
               {reportData.length === 0 ? (
                 <View style={styles.empty}>
@@ -1916,6 +2239,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 10,
   },
+  voidedAttendanceRow: {
+    backgroundColor: colors.rejectedLight,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
   shiftEmpName: {
     flex: 1,
     fontSize: typography.sizes.sm,
@@ -1986,6 +2314,48 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
+  manualAttendanceBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: colors.background,
+  },
+  manualAttendanceBadgeText: {
+    color: colors.primary,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+  },
+  manualAttendanceNoteText: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.xs,
+    marginTop: 6,
+  },
+  voidedBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: colors.rejectedLight,
+  },
+  voidedBadgeText: {
+    color: colors.rejected,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+  },
+  voidedReasonText: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.xs,
+    marginTop: 6,
+  },
   locationLinkBtn: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -2001,6 +2371,25 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: typography.sizes.xs,
     fontWeight: typography.weights.bold,
+  },
+  invalidateAttendanceBtn: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: colors.rejectedLight,
+  },
+  invalidateAttendanceBtnText: {
+    color: colors.rejected,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+  },
+  manualAttendanceBtn: {
+    marginBottom: 16,
   },
   centerListCard: {
     backgroundColor: colors.white,
@@ -2259,6 +2648,20 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.semibold,
     lineHeight: 20,
   },
+  attendanceReasonInput: {
+    minHeight: 96,
+    paddingTop: 12,
+  },
+  manualAttendanceEmployeeList: {
+    maxHeight: 180,
+    marginBottom: 16,
+  },
+  manualOnlyHint: {
+    marginTop: 4,
+    color: colors.primary,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+  },
   deleteLink: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2342,6 +2745,9 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: typography.weights.bold,
     fontSize: typography.sizes.sm,
+  },
+  reportExportBtn: {
+    marginBottom: 16,
   },
   summaryCard: {
     backgroundColor: colors.background,

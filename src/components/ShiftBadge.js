@@ -15,14 +15,14 @@ const SHIFT_CONFIG = {
   afternoon: {
     label: 'Tarde',
     short: 'T',
-    icon: 'wrench',
+    icon: 'weather-sunset',
     bg: colors.afternoonLight,
     text: colors.afternoon,
   },
   night: {
     label: 'Noche',
     short: 'N',
-    icon: 'wrench',
+    icon: 'weather-night',
     bg: colors.nightLight,
     text: colors.night,
   },

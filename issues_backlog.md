@@ -85,7 +85,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción aplicada:* Añadido `avatar_url` en `employees`, bucket privado `avatars` en Supabase Storage con políticas de acceso por usuario/admin, RPC segura para actualizar la referencia, selector de imagen en `SettingsScreen`, refresco del perfil autenticado y reutilización de avatar real con fallback en ajustes y panel de administración.
   - *Criterios de aceptación:* Cumplido. El usuario autenticado puede actualizar su foto desde ajustes, la imagen persiste tras reiniciar sesión, se refleja en las vistas principales con fallback correcto y no permite modificar imágenes de otros usuarios.
 
-- [ ] **Issue #34 - Configurar fichaje por geolocalización flexible por empleado**
+- [x] **Issue #34 - Configurar fichaje por geolocalización flexible por empleado**
   - *Área:* Operativa y control horario.
   - *Severidad:* Media.
   - *Tipo:* Nueva funcionalidad.
@@ -103,8 +103,31 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
     7. Probar manualmente escenarios de empleado móvil, empleado con centro asignado, GPS impreciso, permisos denegados y fichaje fuera de zona.
   - *Problemas encontrados:* Durante la implantación en Supabase SQL Editor, la RPC prevista para validar y registrar el fichaje con geolocalización (`register_attendance_with_location`) provocó errores inconsistentes de parseo/compilación (`42P01 relation ... does not exist`, advertencias falsas de RLS sobre identificadores locales y bloques PL/pgSQL corrompidos por el propio editor), impidiendo cerrar con seguridad la validación sensible en SQL en esta iteración. En pruebas manuales posteriores también apareció un rechazo RLS al insertar fichajes (`42501 new row violates row-level security policy for table "attendances"`) al pasar de RPC a inserción directa desde cliente. Además, en móvil el modal de edición de empleado de administración no permitía desplazarse hasta los botones de acción al seleccionar política de fichaje, bloqueando el guardado en pantallas pequeñas.
   - *Solución aplicada en esta iteración:* Se mantuvo la parte estable en base de datos (`work_centers`, política de fichaje en `employees`, columnas de evidencia en `attendances`, RLS de centros y función `calculate_distance_meters`) y se movió temporalmente la validación operativa al cliente: la app solicita permisos con `expo-location`, calcula distancia/radio en cliente, bloquea fichajes inválidos y persiste la evidencia mínima de ubicación en `attendances`. Se corrigió la política `attendances_insert_own_or_admin` para permitir inserciones del empleado autenticado vinculando `employee_id` con `auth.uid()`. En administración ya se pueden crear centros y asignar la política por empleado, y el modal de edición se adaptó con `ScrollView` y altura máxima para recuperar el guardado en responsive. También se añadió un botón `Mostrar ubicación` en el monitor de fichajes para consultar coordenadas, precisión y abrir el punto en mapas.
-  - *Estado actual:* Implementación funcional inicial completada y validada parcialmente en entorno real: migración base aplicada, fichaje con geolocalización funcionando tras ajuste RLS, trazabilidad visible en admin y UI responsive corregida. Queda recomendable en una iteración posterior reintentar encapsular la validación crítica en RPC o backend cuando el despliegue SQL pueda hacerse con mayor fiabilidad y cerrar la batería manual completa.
-  - *Criterios de aceptación:* Pendiente de cierre final. El admin ya puede configurar el modo de fichaje y la app dispone de validación funcional inicial con trazabilidad; falta completar la batería manual prevista y decidir si la validación definitiva queda consolidada en cliente o se vuelve a mover a backend.
+  - *Estado actual:* Cerrada funcionalmente. La app ya soporta `anywhere`, `assigned_center` y `manual_only`, muestra trazabilidad en admin, abre la evidencia de ubicación desde el monitor y reconsulta la configuración vigente del empleado antes de fichar para evitar decisiones con estado obsoleto en cliente. La validación crítica permanece en cliente en esta iteración, con opción futura de volver a moverla a RPC/backend si se quiere endurecer aún más la lógica sensible.
+  - *Criterios de aceptación:* Cumplidos tras validación manual. Se verificó el comportamiento esperado en `manual_only` y el monitor admin recuperó visibilidad correcta del histórico con evidencia de ubicación; la operativa de geolocalización y trazabilidad queda aceptada para esta iteración.
+  - *Cierre técnico:* Se da por concluida la issue en cliente. Como mejora futura no bloqueante, sigue siendo razonable estudiar una consolidación backend/RPC de la validación de fichaje cuando el ciclo de despliegue SQL sea más estable.
+
+- [ ] **Issue #35 - Permitir anulación auditada de fichajes desde administración**
+  - *Área:* Operativa y control horario.
+  - *Severidad:* Media.
+  - *Tipo:* Nueva funcionalidad.
+  - *Impacto:* Permite corregir errores operativos en fichajes sin perder trazabilidad ni comprometer la auditoría del registro horario.
+  - *Objetivo:* Que el administrador pueda anular fichajes erróneos desde el monitor diario dejando motivo y rastro del cambio, evitando el borrado físico del dato.
+  - *Módulos afectados:* `src/screens/AdminScreen.js`, `src/database/attendanceService.js`, políticas RLS de `attendances` y nueva migración SQL en `supabase/migrations`.
+  - *Propuesta técnica:* Añadir estado auditado al fichaje (`active`/`voided`), motivo de anulación, marca temporal y referencia al admin que ejecuta la acción. Restringir la anulación al último fichaje activo del empleado en ese día para no romper la secuencia de entrada/salida.
+  - *Problema encontrado durante la implantación:* Tras aplicar la migración y el primer cambio de frontend, el monitor de fichajes del panel admin dejó de mostrar registros aunque la tabla `attendances` seguía conteniendo datos. El incidente se manifestó de dos formas: primero con error de columna inexistente (`42703 column attendances.record_status does not exist`) cuando el entorno no tenía aún la migración aplicada; después, incluso con la migración ejecutada, la vista seguía vacía por una combinación de dependencias frágiles en la carga del monitor (filtro diario sensible a fecha/hora y consulta con relación embebida a `employees`).
+  - *Solución aplicada:* Se implementó la migración `20260419113000_issue_35_admin_attendance_controls.sql` con columnas de auditoría y política `update` solo para admin; se añadió servicio `invalidateAttendanceByAdmin` con validación de “último fichaje activo del día”; se reforzó `attendanceService` con compatibilidad hacia atrás cuando `record_status` todavía no existe; y se estabilizó el monitor admin cargando fichajes recientes desde `attendances` sin depender del join embebido con `employees`, resolviendo el nombre del empleado desde el estado ya cargado en administración y aplicando el filtro de fecha en cliente. Con ello volvió a visualizarse el histórico y quedó operativa la anulación auditada.
+  - *Criterios de aceptación:* Pendiente de validación manual tras aplicar migración. El admin puede anular el último fichaje activo del día con motivo obligatorio, el registro sigue visible como anulado en el monitor y el empleado vuelve a operar solo con los fichajes activos restantes.
+
+- [ ] **Issue #26 - Permitir registro manual de fichajes por administración**
+  - *Área:* Operativa y control horario.
+  - *Severidad:* Media.
+  - *Tipo:* Nueva funcionalidad.
+  - *Impacto:* Completa el flujo `manual_only` permitiendo que el administrador registre entradas y salidas cuando el empleado no puede hacerlo desde la app.
+  - *Objetivo:* Que el admin pueda crear manualmente un fichaje de entrada o salida desde el panel, con fecha/hora y motivo operativo opcional, respetando las reglas básicas de secuencia.
+  - *Módulos afectados:* `src/screens/AdminScreen.js`, `src/database/attendanceService.js`, tabla `attendances` y potencial ajuste de auditoría en SQL/RLS.
+  - *Propuesta técnica:* Añadir CTA de alta manual en el monitor admin, selector de empleado, tipo (`in`/`out`), fecha/hora editable y nota administrativa. Reutilizar la lógica de secuencia existente para impedir duplicados o jornadas incoherentes, y registrar que el fichaje fue creado por administración.
+  - *Criterios de aceptación:* El admin puede registrar manualmente una entrada o salida válida, el movimiento aparece inmediatamente en el monitor, queda identificado como creado por administración y convive correctamente con empleados `manual_only`.
 
 - [ ] **Tarea técnica - Estandarizar manejo de errores y reintento en cargas de pantallas**
   - *Área:* Bugs y errores.
@@ -123,6 +146,56 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Módulos afectados:* `package.json`, servicios de `src/database/*`.
   - *Acción recomendada:* Configurar `jest`/`jest-expo`, mocks de Supabase y casos de prueba críticos.
   - *Criterio de aceptación:* La suite se ejecuta en local y cubre al menos reglas principales de vacaciones/auth/fichajes.
+
+### 🔍 Auditoría Técnica Profunda (19/04)
+
+> [!IMPORTANT]
+> Los detalles técnicos completos y la priorización se encuentran en el informe de [Auditoría Técnica](file:///c:/Users/sergi/Proyectos/ppp_grupo3/auditorias/2026-04-19_auditoria_tecnica.md).
+> Todas las implementaciones deben cumplir con el **[Criterio para Nuevas Issues Técnicas](file:///c:/Users/sergi/Proyectos/ppp_grupo3/AGENTS.md)** definido en `AGENTS.md`.
+
+#### 🔴 Prioridad Alta (Integridad y Estabilidad)
+- [x] **Issue #37 - Refactor transaccional de `editRequestVacation` (C-01):**
+  - *Problema:* La edición de vacaciones no era atómica y podía dejar saldos inconsistentes si fallaba a mitad.
+  - *Impacto:* Crítico para la integridad de datos de recursos humanos.
+  - *Solución aplicada:* Creada RPC `edit_vacation_transactional` en Supabase con bloqueo `FOR UPDATE` en las filas de `vacations` y `employees`, cálculo atómico del diferencial de días y validación de saldo dentro de la transacción. Simplificado el servicio cliente para delegar toda la lógica a la RPC, eliminando los cálculos de saldo en cliente y las dos escrituras separadas.
+  - *Migración:* `supabase/migrations/20260419125400_issue_37_transactional_edit_vacation.sql`
+  - *Archivos modificados:* `src/database/vacationService.js`, `src/screens/AdminRequestVacationScreen.js`.
+  - *Severidad:* Crítica.
+  - *Criterio de aceptación:* Cumplido. La edición de vacaciones se ejecuta ahora desde RPC transaccional. Si falla cualquier paso, la transacción se revierte completamente sin dejar estado inconsistente.
+
+- [x] **Issue #38 - Estabilidad y Robustez: Manejo de errores y duplicados (A-02, A-03, A-04, L-03):**
+  - *Problema:* Pantallas críticas (`Vacations`, `Calendar`) sin `try/catch`, `useFocusEffect` duplicado en AdminScreen y comparación de Date por referencia en RequestVacationScreen.
+  - *Solución aplicada:*
+    - **A-02:** Eliminado `useFocusEffect` duplicado en `AdminScreen.js` (líneas 1070-1074).
+    - **A-03:** Añadido `try/catch/finally` en `VacationsScreen.loadVacations` con `Alert` de error.
+    - **A-04:** Añadido `catch` en `CalendarScreen.loadData` para capturar errores de red.
+    - **L-03:** Corregida comparación `startDate !== endDate` a `startDate.getTime() !== endDate.getTime()` en `RequestVacationScreen`.
+  - *Severidad:* Alta.
+  - *Criterio de aceptación:* Cumplido. La app no se bloquea ante fallos de red, AdminScreen no duplica cargas y la comparación de fechas es correcta por valor.
+
+- [ ] **Issue #39 - Seguridad y Limpieza de Entorno (C-02):**
+  - *Acción:* Implementar pre-commit hooks para evitar fugas de `.env` y documentar rotado de claves.
+  - *Severidad:* Crítica.
+
+#### 🟠 Prioridad Media (Refactor y Deuda Técnica)
+- [ ] **Issue #40 - Refactor Estructural de `AdminScreen.js` (A-01):**
+  - *Problema:* Fichero de ~3000 líneas. Inmantenible y lento.
+  - *Propuesta:* Dividir en componentes independientes por cada pestaña y extraer modales.
+  - *Severidad:* Alta (Técnica).
+
+- [x] **Issue #41 - Consistencia Visual y Limpieza de Código (A-05, A-06, M-06, M-07, M-10):**
+  - *Solución aplicada:*
+    - **A-05:** Corregidos iconos de `ShiftBadge` (`wrench` → `weather-sunset` / `weather-night`).
+    - **A-06:** Centralizado `LocaleConfig` en `src/config/calendarLocale.js`, importado una vez en `App.js` y eliminadas 3 copias idénticas.
+    - **M-06:** Eliminada función muerta `handleFillAll`.
+    - **M-07:** Sustituido import dinámico de `deleteShift` por import estático ya existente.
+    - **M-10:** Eliminada función muerta `construirMatrizPDF`.
+  - *Severidad:* Media.
+  - *Criterio de aceptación:* Cumplido. Iconos coherentes, configuración centralizada y ~60 líneas de código muerto eliminadas.
+
+- [ ] **Issue #42 - Integridad de Usuarios en Borrado de Empleados (M-02):**
+  - *Acción:* Crear Edge Function para eliminar el usuario de `auth.users` cuando se borra un empleado.
+  - *Severidad:* Media.
 
 #### 🟡 Mejora continua
 - [x] **Mejora interna - Ocultar credenciales demo en producción**

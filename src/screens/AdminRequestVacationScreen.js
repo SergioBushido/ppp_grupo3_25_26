@@ -11,20 +11,11 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, addDays, differenceInCalendarDays, isValid, parseISO, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar, LocaleConfig } from 'react-native-calendars';
+import { Calendar } from 'react-native-calendars';
 import { useAuth } from '../context/AuthContext';
 import { editRequestVacation } from '../database/vacationService';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
-
-LocaleConfig.locales['es'] = {
-  monthNames: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
-  monthNamesShort: ['Ene.', 'Feb.', 'Mar', 'Abr', 'May', 'Jun', 'Jul.', 'Ago', 'Sept.', 'Oct.', 'Nov.', 'Dic.'],
-  dayNames: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
-  dayNamesShort: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
-  today: 'Hoy'
-};
-LocaleConfig.defaultLocale = 'es';
 
 function parseVacationDate(value) {
   if (!value) return null;
@@ -139,10 +130,8 @@ export default function AdminRequestVacationScreen({ navigation, route }) {
     try {
       await editRequestVacation({
         vacation_id: employeeVacation?.id,
-        employee_id: employeeVacation?.employee_id,
         start_date: formatVacationDate(startDate),
         end_date: formatVacationDate(effectiveEnd),
-        available_days: newAvailableDays
       });
 
       await refreshUser();
