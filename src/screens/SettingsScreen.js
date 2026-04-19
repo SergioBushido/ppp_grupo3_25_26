@@ -159,7 +159,7 @@ export default function SettingsScreen() {
               onPress={handlePickAvatar}
               disabled={isAvatarLoading}
             >
-              <MaterialCommunityIcons name="image-edit-outline" size={18} color={colors.primary} />
+              <MaterialCommunityIcons name="image-edit-outline" size={18} color={colors.white} />
               <Text style={styles.secondaryBtnText}>{user?.avatar_url ? 'Cambiar foto' : 'Subir foto'}</Text>
             </TouchableOpacity>
             {!!user?.avatar_storage_path && (
@@ -196,7 +196,7 @@ export default function SettingsScreen() {
             onPress={() => setPassModalVisible(true)}
           >
             <View style={styles.actionIcon}>
-              <MaterialCommunityIcons name="lock-reset" size={20} color={colors.primary} />
+              <MaterialCommunityIcons name="lock-reset" size={20} color={colors.white} />
             </View>
             <View style={styles.actionInfo}>
               <Text style={styles.actionTitle}>Cambiar contraseña</Text>
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary,
     borderRadius: 14,
   },
   secondaryBtnDisabled: {
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   secondaryBtnText: {
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.bold,
-    color: colors.primary,
+    color: colors.white,
   },
   removeAvatarBtn: {
     flexDirection: 'row',
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
