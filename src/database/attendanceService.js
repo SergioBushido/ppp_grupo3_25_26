@@ -13,6 +13,9 @@ function normalizeAttendanceRecord(record) {
     voided_at: null,
     voided_by_employee_id: null,
     void_reason: null,
+    entry_mode: 'self_service',
+    created_by_employee_id: null,
+    admin_note: null,
     ...record,
   };
 }
@@ -44,27 +47,25 @@ async function getAttendanceById(attendanceId) {
   return data;
 }
 
-export async function getTodayAttendance(employeeId) {
-  const { dayStart: todayStart, dayEnd: todayEnd } = buildLocalDayBounds(new Date());
+async function getActiveAttendancesForDate(employeeId, date) {
+  const { dayStart, dayEnd } = buildLocalDayBounds(date);
 
-  const activeQuery = supabase
+  const { data, error } = await supabase
     .from('attendances')
     .select('*')
     .eq('employee_id', employeeId)
     .eq('record_status', 'active')
-    .gte('timestamp', todayStart.toISOString())
-    .lte('timestamp', todayEnd.toISOString())
+    .gte('timestamp', dayStart.toISOString())
+    .lte('timestamp', dayEnd.toISOString())
     .order('timestamp', { ascending: true });
-
-  const { data, error } = await activeQuery;
 
   if (isMissingAttendanceAuditColumn(error)) {
     const { data: fallbackData, error: fallbackError } = await supabase
       .from('attendances')
       .select('*')
       .eq('employee_id', employeeId)
-      .gte('timestamp', todayStart.toISOString())
-      .lte('timestamp', todayEnd.toISOString())
+      .gte('timestamp', dayStart.toISOString())
+      .lte('timestamp', dayEnd.toISOString())
       .order('timestamp', { ascending: true });
 
     if (fallbackError) throw fallbackError;
@@ -73,6 +74,10 @@ export async function getTodayAttendance(employeeId) {
 
   if (error) throw error;
   return (data || []).map(normalizeAttendanceRecord);
+}
+
+export async function getTodayAttendance(employeeId) {
+  return getActiveAttendancesForDate(employeeId, new Date());
 }
 
 export async function registerAttendance(employeeId, type) {
@@ -214,6 +219,86 @@ export async function getRecentAttendances(limit = 50) {
   return (data || []).map((record) => ({
     ...normalizeAttendanceRecord(record),
   }));
+}
+
+export async function createManualAttendanceByAdmin({
+  adminEmployeeId,
+  employeeId,
+  type,
+  timestamp,
+  note,
+}) {
+  if (!adminEmployeeId) {
+    throw new Error('No se ha identificado al administrador actual.');
+  }
+
+  if (!employeeId) {
+    throw new Error('Debes seleccionar un empleado.');
+  }
+
+  if (!['in', 'out'].includes(type)) {
+    throw new Error('Tipo de fichaje manual no valido.');
+  }
+
+  if (!timestamp) {
+    throw new Error('Debes indicar una fecha y hora validas para el fichaje.');
+  }
+
+  const manualDate = new Date(timestamp);
+  if (Number.isNaN(manualDate.getTime())) {
+    throw new Error('La fecha y hora del fichaje manual no son validas.');
+  }
+
+  const activeRecords = await getActiveAttendancesForDate(employeeId, manualDate);
+  const hasIn = activeRecords.some((record) => record.type === 'in');
+  const hasOut = activeRecords.some((record) => record.type === 'out');
+
+  if (type === 'in') {
+    if (hasIn) {
+      throw new Error('Ese empleado ya tiene una entrada activa registrada en esa fecha.');
+    }
+    if (hasOut) {
+      throw new Error('No se puede registrar una entrada manual despues de una salida ya registrada en esa fecha.');
+    }
+  }
+
+  if (type === 'out') {
+    if (!hasIn) {
+      throw new Error('No se puede registrar una salida manual sin una entrada activa previa en esa fecha.');
+    }
+    if (hasOut) {
+      throw new Error('Ese empleado ya tiene una salida activa registrada en esa fecha.');
+    }
+
+    const activeEntry = activeRecords.find((record) => record.type === 'in');
+    if (activeEntry && new Date(activeEntry.timestamp) > manualDate) {
+      throw new Error('La salida manual no puede ser anterior a la entrada registrada.');
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('attendances')
+    .insert([{
+      employee_id: employeeId,
+      type,
+      timestamp: manualDate.toISOString(),
+      location_status: 'not_required',
+      location_note: null,
+      entry_mode: 'admin_manual',
+      created_by_employee_id: adminEmployeeId,
+      admin_note: note?.trim() || null,
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    if (error?.code === '42703' && (error?.message?.includes('entry_mode') || error?.message?.includes('created_by_employee_id') || error?.message?.includes('admin_note'))) {
+      throw new Error('Debes aplicar la migracion de fichaje manual admin antes de usar esta accion.');
+    }
+    throw error;
+  }
+
+  return normalizeAttendanceRecord(data);
 }
 
 export async function invalidateAttendanceByAdmin(attendanceId, { adminEmployeeId, reason }) {

@@ -119,7 +119,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Solución aplicada:* Se implementó la migración `20260419113000_issue_35_admin_attendance_controls.sql` con columnas de auditoría y política `update` solo para admin; se añadió servicio `invalidateAttendanceByAdmin` con validación de “último fichaje activo del día”; se reforzó `attendanceService` con compatibilidad hacia atrás cuando `record_status` todavía no existe; y se estabilizó el monitor admin cargando fichajes recientes desde `attendances` sin depender del join embebido con `employees`, resolviendo el nombre del empleado desde el estado ya cargado en administración y aplicando el filtro de fecha en cliente. Con ello volvió a visualizarse el histórico y quedó operativa la anulación auditada.
   - *Criterios de aceptación:* Pendiente de validación manual tras aplicar migración. El admin puede anular el último fichaje activo del día con motivo obligatorio, el registro sigue visible como anulado en el monitor y el empleado vuelve a operar solo con los fichajes activos restantes.
 
-- [ ] **Issue #36 - Permitir registro manual de fichajes por administración**
+- [ ] **Issue #26 - Permitir registro manual de fichajes por administración**
   - *Área:* Operativa y control horario.
   - *Severidad:* Media.
   - *Tipo:* Nueva funcionalidad.
