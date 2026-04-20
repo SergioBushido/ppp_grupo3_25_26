@@ -110,12 +110,17 @@ export function AuthProvider({ children }) {
   }, []);
 
   const refreshUser = useCallback(async () => {
-    if (!user) return;
+    if (!user) return null;
     try {
       const updated = await getEmployeeById(user.id);
-      if (updated) setUser(updated);
+      if (updated) {
+        setUser(updated);
+        return updated;
+      }
+      return null;
     } catch (e) {
       console.warn('Error en refreshUser', e);
+      return null;
     }
   }, [user]);
 

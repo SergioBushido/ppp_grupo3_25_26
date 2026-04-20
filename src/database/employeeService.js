@@ -159,14 +159,23 @@ export async function deleteEmployee(id) {
 }
 
 export async function clearPasswordChangeRequirement(employeeId) {
-  const { error } = await supabase
-    .from('employees')
-    .update({
-      requires_password_change: false,
-    })
-    .eq('id', employeeId);
-    
-  if (error) throw error;
+  // Intentamos limpiar nuestro propio flag mediante un RPC seguro (Security Definer)
+  // Esto es necesario porque el RLS restringe el UPDATE de la tabla empleados solo a admins.
+  const { data: success, error: rpcError } = await supabase.rpc('complete_own_password_change');
+  
+  if (rpcError) {
+    console.warn('Error al ejecutar RPC complete_own_password_change, reintentando via update directo:', rpcError);
+    // Fallback: Si el RPC falla (ej. por permisos o migracion no aplicada), 
+    // intentamos el update directo (esto solo funcionara si el usuario es Admin).
+    const { error } = await supabase
+      .from('employees')
+      .update({
+        requires_password_change: false,
+      })
+      .eq('id', employeeId);
+      
+    if (error) throw error;
+  }
 }
 
 export async function markPasswordChangeRequired(employeeId) {

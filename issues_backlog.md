@@ -154,6 +154,15 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 > Todas las implementaciones deben cumplir con el **[Criterio para Nuevas Issues Técnicas](file:///c:/Users/sergi/Proyectos/ppp_grupo3/AGENTS.md)** definido en `AGENTS.md`.
 
 #### 🔴 Prioridad Alta (Integridad y Estabilidad)
+- [x] **Issue #44 - Corregir bloqueo por RLS en el primer cambio de contraseña:**
+  - *Área:* Seguridad y Autenticación.
+  - *Severidad:* Crítica.
+  - *Tipo:* Bug confirmado.
+  - *Impacto:* Bloqueo total del acceso para nuevos empleados tras el primer login al no poder limpiar su propio flag de cambio obligatorio por restricciones de RLS.
+  - *Solución aplicada:* Creada una RPC `complete_own_password_change` con `security definer` en Supabase para permitir que los usuarios limpien su propio flag de forma segura. Actualizado `employeeService.js` para invocar esta RPC y reforzada la lógica de `ForcePasswordChangeScreen.js` con un retardo de consistencia y verificación de perfil antes de transicionar.
+  - *Migración:* `supabase/migrations/20260420_fix_password_change_rls.sql`.
+  - *Criterio de aceptación:* Cumplido. Los nuevos usuarios pueden cambiar su contraseña y acceder a la sesión principal sin intervención manual del administrador.
+
 - [x] **Issue #37 - Refactor transaccional de `editRequestVacation` (C-01):**
   - *Problema:* La edición de vacaciones no era atómica y podía dejar saldos inconsistentes si fallaba a mitad.
   - *Impacto:* Crítico para la integridad de datos de recursos humanos.

@@ -29,20 +29,32 @@ export default function ForcePasswordChangeScreen() {
 
     try {
       setLoading(true);
+      
+      // 1. Update the password in Auth and update the employee profile requirement
       await changePassword(user.id, newPass);
+      
+      // 2. Small delay to ensure DB propagation consistency
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // 3. Refresh user profile from database
+      const updatedUser = await refreshUser();
+      
       setLoading(false);
-      Alert.alert(
-        '✅ Éxito', 
-        'Contraseña actualizada correctamente.',
-        [
-          { 
-            text: 'Continuar', 
-            onPress: async () => {
-              await refreshUser(); 
-            } 
-          }
-        ]
-      );
+
+      if (updatedUser && !updatedUser.requires_password_change) {
+        Alert.alert(
+          '✅ Éxito', 
+          'Contraseña actualizada correctamente. ¡Bienvenido!',
+          [{ text: 'Entendido' }]
+        );
+      } else {
+        // Fallback if the requirement flag didn't clear for some reason
+        Alert.alert(
+          'Aviso',
+          'La contraseña se cambió, pero el perfil aún requiere actualización. Por favor, intenta entrar de nuevo.',
+          [{ text: 'Reintentar', onPress: refreshUser }]
+        );
+      }
     } catch (error) {
       setLoading(false);
       Alert.alert('Error', error.message || 'No se pudo cambiar la contraseña.');
