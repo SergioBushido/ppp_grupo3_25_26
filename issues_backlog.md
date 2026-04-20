@@ -178,10 +178,12 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Severidad:* Crítica.
 
 #### 🟠 Prioridad Media (Refactor y Deuda Técnica)
-- [ ] **Issue #40 - Refactor Estructural de `AdminScreen.js` (A-01):**
+- [x] **Issue #40 - Refactor Estructural de `AdminScreen.js` (A-01):**
   - *Problema:* Fichero de ~3000 líneas. Inmantenible y lento.
-  - *Propuesta:* Dividir en componentes independientes por cada pestaña y extraer modales.
+  - *Solución aplicada:* Dividido el monolito en 16 módulos independientes: 5 tabs (`RequestsTab`, `ShiftsTab`, `AttendancesTab`, `EmployeesTab`, `ReportsTab`), 9 modales, 1 fichero de estilos y 1 de constantes. `AdminScreen.js` reducido de ~2870 a ~500 líneas como container.
+  - *Archivos creados:* `src/screens/Admin/tabs/`, `src/screens/Admin/modals/`, `AdminScreen.styles.js`, `constants.js`.
   - *Severidad:* Alta (Técnica).
+  - *Criterio de aceptación:* Cumplido. Metro compila sin errores (2384 módulos), UI y funcionalidad idénticas al original.
 
 - [x] **Issue #41 - Consistencia Visual y Limpieza de Código (A-05, A-06, M-06, M-07, M-10):**
   - *Solución aplicada:*
@@ -196,6 +198,12 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 - [ ] **Issue #42 - Integridad de Usuarios en Borrado de Empleados (M-02):**
   - *Acción:* Crear Edge Function para eliminar el usuario de `auth.users` cuando se borra un empleado.
   - *Severidad:* Media.
+
+- [ ] **Issue #43 - Optimización de Carga de Datos en Panel Admin:**
+  - *Problema:* La carga inicial del panel Admin es lenta porque `loadAll` descarga todas las entidades (vacaciones, empleados, centros) en una sola llamada, independientemente de la pestaña activa.
+  - *Propuesta:* Implementar lazy loading por pestaña (solo cargar datos del tab activo), caché local con TTL para evitar re-fetches innecesarios y skeleton loaders para mejorar la percepción de velocidad.
+  - *Severidad:* Media.
+  - *Módulos afectados:* `src/screens/AdminScreen.js`.
 
 #### 🟡 Mejora continua
 - [x] **Mejora interna - Ocultar credenciales demo en producción**
