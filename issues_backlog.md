@@ -204,9 +204,10 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Severidad:* Media.
   - *Criterio de aceptación:* Cumplido. Iconos coherentes, configuración centralizada y ~60 líneas de código muerto eliminadas.
 
-- [ ] **Issue #42 - Integridad de Usuarios en Borrado de Empleados (M-02):**
-  - *Acción:* Crear Edge Function para eliminar el usuario de `auth.users` cuando se borra un empleado.
+- [x] **Issue #42 - Integridad de Usuarios en Borrado de Empleados (M-02):**
+  - *Solución aplicada:* Creada Edge Function `delete-employee` que elimina coordinadamente el perfil de `public.employees`, el usuario de `auth.users` y el avatar del bucket de Storage. Refactorizado `deleteEmployee` en `employeeService.js` para invocar la Edge Function en lugar de un `DELETE` directo. Actualizado `AdminScreen.js` para pasar `auth_user_id` y mostrar confirmación al completar. Se implementó protección contra auto-eliminación del admin.
   - *Severidad:* Media.
+  - *Criterio de aceptación:* Cumplido. Al borrar un empleado desde el panel, se eliminan el perfil, la cuenta Auth y el avatar. El email queda liberado para futuras altas.
 
 - [ ] **Issue #43 - Optimización de Carga de Datos en Panel Admin:**
   - *Problema:* La carga inicial del panel Admin es lenta porque `loadAll` descarga todas las entidades (vacaciones, empleados, centros) en una sola llamada, independientemente de la pestaña activa.
