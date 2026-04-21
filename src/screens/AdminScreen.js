@@ -567,8 +567,8 @@ export default function AdminScreen() {
     Alert.alert('Eliminar Empleado', `¿Estás seguro de que deseas eliminar a ${editingEmployee.name}? Esta acción es irreversible.`, [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Eliminar', style: 'destructive', onPress: async () => {
-        try { await deleteEmployee(editingEmployee.id); await loadAll(); setEditModalVisible(false); }
-        catch (e) { Alert.alert('Error', 'No se pudo eliminar el empleado.'); }
+        try { await deleteEmployee(editingEmployee.id, editingEmployee.auth_user_id); await loadAll(); setEditModalVisible(false); Alert.alert('✅ Eliminado', 'El empleado y su cuenta de acceso han sido eliminados.'); }
+        catch (e) { Alert.alert('Error', e.message || 'No se pudo eliminar el empleado.'); }
       }},
     ]);
   };

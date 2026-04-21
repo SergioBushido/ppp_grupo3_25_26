@@ -149,13 +149,21 @@ export async function updateAvailableDays(employeeId, days) {
   if (error) throw error;
 }
 
-export async function deleteEmployee(id) {
-  const { error } = await supabase
-    .from('employees')
-    .delete()
-    .eq('id', id);
-  
+export async function deleteEmployee(id, authUserId = null) {
+  const { data, error } = await supabase.functions.invoke('delete-employee', {
+    body: {
+      employeeId: id,
+      authUserId,
+    },
+  });
+
   if (error) throw error;
+
+  if (data?.warning) {
+    console.warn('Advertencia al eliminar empleado:', data.warning);
+  }
+
+  return data;
 }
 
 export async function clearPasswordChangeRequirement(employeeId) {
