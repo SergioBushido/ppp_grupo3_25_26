@@ -54,7 +54,27 @@ export default function AdminScreen() {
   const [allVacations, setAllVacations] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [workCenters, setWorkCenters] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Modular loading states
+  const [baseDataLoading, setBaseDataLoading] = useState(false);
+  const [baseDataLoaded, setBaseDataLoaded] = useState(false);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [shiftsLoading, setShiftsLoading] = useState(false);
+  const [attendancesLoading, setAttendancesLoading] = useState(false);
+  const [reportsLoading, setReportsLoading] = useState(false);
+
+  // Helper to determine if the active tab is loading
+  const isActiveTabLoading = () => {
+    if (exportandoPDF) return true;
+    switch (activeTab) {
+      case 'requests': return requestsLoading;
+      case 'shifts': return shiftsLoading || baseDataLoading;
+      case 'attendances': return attendancesLoading || baseDataLoading;
+      case 'employees': return baseDataLoading;
+      case 'reports': return reportsLoading || baseDataLoading;
+      default: return false;
+    }
+  };
 
   // Shifts management
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -158,86 +178,121 @@ export default function AdminScreen() {
   const [exportandoPDF, setExportandoPDF] = useState(false);
 
   // ────────────────────────────────────────────
-  // Data loading
+  // Modular Data Loading
   // ────────────────────────────────────────────
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
+  const loadBaseData = useCallback(async () => {
+    if (baseDataLoaded) return;
+    setBaseDataLoading(true);
     try {
-      const [pending, all, emps, centers] = await Promise.all([
-        getAllPendingVacations(),
-        getAllVacations(),
+      const [emps, centers] = await Promise.all([
         getAllEmployees(),
         getAllWorkCenters(),
       ]);
-      setPendingVacations(pending);
-      setAllVacations(all);
       setEmployees(emps.filter((e) => e.role === 'employee'));
       setWorkCenters(centers);
+      setBaseDataLoaded(true);
     } catch (e) {
-      console.error("Error loading Admin data:", e);
-      Alert.alert("Error", "No se pudieron cargar los datos del panel.");
+      console.error("Error loading base data:", e);
+      Alert.alert("Error", "No se pudieron cargar los datos base (empleados/centros).");
     } finally {
-      setLoading(false);
+      setBaseDataLoading(false);
+    }
+  }, [baseDataLoaded]);
+
+  const loadRequests = useCallback(async () => {
+    setRequestsLoading(true);
+    try {
+      const [pending, all] = await Promise.all([
+        getAllPendingVacations(),
+        getAllVacations(),
+      ]);
+      setPendingVacations(pending);
+      setAllVacations(all);
+    } catch (e) {
+      console.error("Error loading requests:", e);
+    } finally {
+      setRequestsLoading(false);
     }
   }, []);
 
   const loadDayShifts = useCallback(async () => {
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const s = await getShiftsByDate(dateStr);
-    setDayShifts(s);
+    setShiftsLoading(true);
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const s = await getShiftsByDate(dateStr);
+      setDayShifts(s);
+    } catch (e) {
+      console.error("Error loading day shifts:", e);
+    } finally {
+      setShiftsLoading(false);
+    }
   }, [selectedDate]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadAll();
-      loadDayShifts();
-    }, [loadAll, loadDayShifts])
-  );
-
+  // Main UI coordination useEffect
   useEffect(() => {
-    if (activeTab === 'shifts') loadDayShifts();
-  }, [selectedDate, activeTab, loadDayShifts]);
+    const fetchTabData = async () => {
+      try {
+        if (activeTab === 'requests') {
+          await loadRequests();
+        } else if (activeTab === 'shifts') {
+          await Promise.all([loadBaseData(), loadDayShifts()]);
+        } else if (activeTab === 'attendances') {
+          await Promise.all([loadBaseData(), loadDayAttendances()]);
+        } else if (activeTab === 'employees') {
+          await loadBaseData();
+        } else if (activeTab === 'reports') {
+          await Promise.all([loadBaseData(), loadReportData()]);
+        }
+      } catch (e) {
+        console.error("Error dispatching tab data:", e);
+      }
+    };
+    fetchTabData();
+  }, [activeTab, selectedDate, attendanceDate, reportMonth, loadBaseData, loadRequests, loadDayShifts]);
 
   const loadDayAttendances = useCallback(async () => {
-    const dateStr = format(attendanceDate, 'yyyy-MM-dd');
-    let records = [];
-    let usedRecentFallback = false;
-
+    setAttendancesLoading(true);
     try {
-      records = await getAllAttendancesByDate(attendanceDate);
+      const dateStr = format(attendanceDate, 'yyyy-MM-dd');
+      let records = [];
+      let usedRecentFallback = false;
+
+      try {
+        records = await getAllAttendancesByDate(attendanceDate);
+      } catch (e) {
+        console.error('Error loading day attendances:', e);
+      }
+
+      const activeRecords = [...records]
+        .filter((record) => record.record_status !== 'voided')
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+      const empStatus = {};
+      const latestActiveByEmployee = {};
+      activeRecords.forEach(r => {
+        empStatus[r.employee_id] = r.type;
+        latestActiveByEmployee[r.employee_id] = r.id;
+      });
+
+      const enrichedRecords = records.map(r => ({
+        ...r,
+        employee_name: employees.find((employee) => employee.id === r.employee_id)?.name || `Empleado #${r.employee_id}`,
+        isActive: r.record_status !== 'voided' && empStatus[r.employee_id] === 'in' && format(new Date(), 'yyyy-MM-dd') === dateStr,
+        canInvalidate: r.record_status !== 'voided' && latestActiveByEmployee[r.employee_id] === r.id,
+      }));
+
+      setDayAttendances(enrichedRecords);
+      setAttendanceUsesRecentFallback(usedRecentFallback);
     } catch (e) {
-      console.error('Error loading day attendances:', e);
+      console.error('Outer error loading day attendances:', e);
+    } finally {
+      setAttendancesLoading(false);
     }
-
-    const activeRecords = [...records]
-      .filter((record) => record.record_status !== 'voided')
-      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-    const empStatus = {};
-    const latestActiveByEmployee = {};
-    activeRecords.forEach(r => {
-      empStatus[r.employee_id] = r.type;
-      latestActiveByEmployee[r.employee_id] = r.id;
-    });
-
-    const enrichedRecords = records.map(r => ({
-      ...r,
-      employee_name: employees.find((employee) => employee.id === r.employee_id)?.name || `Empleado #${r.employee_id}`,
-      isActive: r.record_status !== 'voided' && empStatus[r.employee_id] === 'in' && format(new Date(), 'yyyy-MM-dd') === dateStr,
-      canInvalidate: r.record_status !== 'voided' && latestActiveByEmployee[r.employee_id] === r.id,
-    }));
-
-    setDayAttendances(enrichedRecords);
-    setAttendanceUsesRecentFallback(usedRecentFallback);
   }, [attendanceDate, employees]);
 
-  useEffect(() => {
-    if (activeTab === 'attendances') loadDayAttendances();
-  }, [activeTab, loadDayAttendances]);
-
   const loadReportData = useCallback(async () => {
-    setLoading(true);
+    setReportsLoading(true);
     try {
       const year = reportMonth.getFullYear();
       const month = reportMonth.getMonth() + 1;
@@ -267,13 +322,9 @@ export default function AdminScreen() {
       });
       setReportData(data);
     } finally {
-      setLoading(false);
+      setReportsLoading(false);
     }
   }, [reportMonth]);
-
-  useEffect(() => {
-    if (activeTab === 'reports') loadReportData();
-  }, [activeTab, loadReportData]);
 
   // ────────────────────────────────────────────
   // Memos
@@ -718,7 +769,7 @@ export default function AdminScreen() {
         ))}
       </View>
 
-      {loading || exportandoPDF ? (
+      {isActiveTabLoading() ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
       ) : (<>
         {activeTab === 'requests' && (
