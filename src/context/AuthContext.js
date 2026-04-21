@@ -35,7 +35,7 @@ export function AuthProvider({ children }) {
         try {
           await signOut();
         } catch (_logoutError) {
-          // Ignore cleanup errors while restoring the initial session.
+          // Ignorar errores de limpieza si hubo un fallo intentando restaurar la sesion inicial
         }
         setSession(null);
         setUser(null);
@@ -85,7 +85,7 @@ export function AuthProvider({ children }) {
       try {
         await signOut();
       } catch (_logoutError) {
-        // No-op: if login failed before creating a session there is nothing else to clean up.
+        // No hacer nada: si el login falla antes de crear una sesion, no hay nada que limpiar.
       }
 
       setSession(null);
@@ -143,6 +143,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) throw new Error('useAuth debe ser usado dentro de un AuthProvider (proveedor de contexto)');
   return ctx;
 }
