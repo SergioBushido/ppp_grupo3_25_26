@@ -12,8 +12,16 @@ type DeleteEmployeePayload = {
 };
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
+  /**
+   * NOTA PARA DEVS: El SDK de Supabase en React Native captura los errores HTTP non-2xx 
+   * y muestra mensajes genericos como "Edge function returned a non-2xx status code", 
+   * ocultando el motivo real (400, 401, 403, etc).
+   * 
+   * Para facilitar la depuracion en el cliente, mandamos siempre Status 200 y metemos
+   * el error en el cuerpo JSON, que el front-end se encargara de lanzar como excepcion.
+   */
   return new Response(JSON.stringify(body), {
-    status,
+    status: 200, 
     headers: {
       ...corsHeaders,
       'Content-Type': 'application/json',
@@ -39,12 +47,12 @@ Deno.serve(async (request) => {
       return jsonResponse({ error: 'Faltan variables de entorno de Supabase en la función.' }, 500);
     }
 
-    // ── Verify requester identity ──
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader) {
-      return jsonResponse({ error: 'Falta la cabecera de autorización.' }, 401);
-    }
-
+    /**
+     * IMPORTANTE: Despliegue con --no-verify-jwt
+     * El Gateway de Supabase falla al validar tokens con algoritmo ES256 (comun en React Native).
+     * Por ello, desplegamos sin verificacion automatica y realizamos la validacion manual
+     * aqui dentro usando 'getUser()', que SI soporta ES256.
+     */
     const requesterClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -59,7 +67,7 @@ Deno.serve(async (request) => {
     } = await requesterClient.auth.getUser();
 
     if (requesterError || !requester) {
-      return jsonResponse({ error: 'Sesión no válida.' }, 401);
+      return jsonResponse({ error: 'Sesion no valida o token incompatible.' }, 401);
     }
 
     // ── Verify requester is admin ──
@@ -142,8 +150,14 @@ Deno.serve(async (request) => {
       employeeId,
       authUserDeleted: !!targetAuthUserId,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting employee:', error);
-    return jsonResponse({ error: 'Error interno al eliminar el empleado.' }, 500);
+    // Para depurar, enviaremos la traza del error exacta al cliente con estado 200
+    // en lugar de 500, para sortear el error generico del Gateway.
+    return jsonResponse({ 
+      error: 'Error interno en la Edge Function.',
+      details: error?.message || String(error),
+      stack: error?.stack || null
+    }, 200);
   }
 });

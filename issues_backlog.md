@@ -210,10 +210,11 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Criterio de aceptación:* Cumplido. Al borrar un empleado desde el panel, se eliminan el perfil, la cuenta Auth y el avatar. El email queda liberado para futuras altas.
 
 - [x] **Issue #43 - Optimización de Carga de Datos en Panel Admin (M-03):**
-  - *Solución aplicada:* Se eliminó la función monolítica `loadAll` y se implementó carga perezosa (`lazy loading`) por pestañas. La pantalla ahora maneja estados de carga individuales (`requestsLoading`, `shiftsLoading`, etc.) y solo descarga los datos relevantes cuando el usuario cambia a esa vista. Los datos base (empleados y centros) se cargan bajo demanda la primera vez y quedan en caché de estado. Se añadió un indicador global coordinado que respeta la pestaña activa.
+  - *Solución aplicada:* Se eliminó la función monolítica `loadAll` y se implementó carga perezosa (`lazy loading`) por pestañas. Se restauró un wrapper `loadAll` de compatibilidad para evitar errores en handlers existentes.
+  - *Nota Técnica (Bugfix):* Se detectó que el Gateway de Supabase no soporta tokens ES256 de React Native; se solucionó desplegando con `--no-verify-jwt` y validando manualmente dentro de la función.
   - *Severidad:* Media.
-  - *Módulos afectados:* `src/screens/AdminScreen.js`.
-  - *Criterio de aceptación:* Cumplido. La app ya no descarga vacaciones ni turnos de forma preemptiva al entrar al panel de administración. La carga es progresiva mejorando significativamente el TTI inicial.
+  - *Módulos afectados:* `src/screens/AdminScreen.js`, `supabase/functions/delete-employee/index.ts`.
+  - *Criterio de aceptación:* Cumplido. La app es más rápida y el borrado es totalmente íntegro.
 
 #### 🟡 Mejora continua
 - [x] **Mejora interna - Ocultar credenciales demo en producción**

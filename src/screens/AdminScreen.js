@@ -55,7 +55,9 @@ export default function AdminScreen() {
   const [employees, setEmployees] = useState([]);
   const [workCenters, setWorkCenters] = useState([]);
   
-  // Modular loading states
+  // ESTADOS DE CARGA MODULARES
+  // A diferencia de un unico estado 'loading', aqui separamos la carga por tab.
+  // Esto permite que el usuario vea la estructura de la app mientras los datos especificos se descargan.
   const [baseDataLoading, setBaseDataLoading] = useState(false);
   const [baseDataLoaded, setBaseDataLoaded] = useState(false);
   const [requestsLoading, setRequestsLoading] = useState(true);
@@ -63,7 +65,8 @@ export default function AdminScreen() {
   const [attendancesLoading, setAttendancesLoading] = useState(false);
   const [reportsLoading, setReportsLoading] = useState(false);
 
-  // Helper to determine if the active tab is loading
+  // Helper para centralizar la logica de si la pantalla "esta cargando".
+  // Devuelve true si la pestaña activa necesita datos que aun se estan bajando.
   const isActiveTabLoading = () => {
     if (exportandoPDF) return true;
     switch (activeTab) {
@@ -178,9 +181,12 @@ export default function AdminScreen() {
   const [exportandoPDF, setExportandoPDF] = useState(false);
 
   // ────────────────────────────────────────────
-  // Modular Data Loading
+  // CARGA DE DATOS MODULAR (LAZY LOADING)
+  // Estas funciones reemplazan al antiguo monolito 'loadAll'.
   // ────────────────────────────────────────────
 
+  // Datos base: Empleados y Centros de Trabajo. 
+  // Se cargan una sola vez bajo demanda y se mantienen en cache de estado (baseDataLoaded).
   const loadBaseData = useCallback(async () => {
     if (baseDataLoaded) return;
     setBaseDataLoading(true);
@@ -193,13 +199,14 @@ export default function AdminScreen() {
       setWorkCenters(centers);
       setBaseDataLoaded(true);
     } catch (e) {
-      console.error("Error loading base data:", e);
-      Alert.alert("Error", "No se pudieron cargar los datos base (empleados/centros).");
+      console.error("Error al cargar datos base:", e);
+      Alert.alert("Error", "No se pudieron cargar los empleados o centros.");
     } finally {
       setBaseDataLoading(false);
     }
   }, [baseDataLoaded]);
 
+  // Cargador especifico de solicitudes de vacaciones
   const loadRequests = useCallback(async () => {
     setRequestsLoading(true);
     try {
@@ -210,12 +217,13 @@ export default function AdminScreen() {
       setPendingVacations(pending);
       setAllVacations(all);
     } catch (e) {
-      console.error("Error loading requests:", e);
+      console.error("Error al cargar solicitudes:", e);
     } finally {
       setRequestsLoading(false);
     }
   }, []);
 
+  // Cargador especifico de turnos del dia seleccionado
   const loadDayShifts = useCallback(async () => {
     setShiftsLoading(true);
     try {
@@ -223,13 +231,31 @@ export default function AdminScreen() {
       const s = await getShiftsByDate(dateStr);
       setDayShifts(s);
     } catch (e) {
-      console.error("Error loading day shifts:", e);
+      console.error("Error al cargar turnos del dia:", e);
     } finally {
       setShiftsLoading(false);
     }
   }, [selectedDate]);
 
-  // Main UI coordination useEffect
+  /** 
+   * WRAPPER COMPATIBILIDAD (loadAll)
+   * Importante: Muchos handlers de la UI (borrados, ediciones) llaman a loadAll()
+   * para refrescar la vista. Este wrapper garantiza que sigan funcionando sin errores,
+   * coordinando la recarga de los datos principales.
+   */
+  const loadAll = useCallback(async () => {
+    setBaseDataLoaded(false); // Forzamos recarga de empleados/centros
+    await Promise.all([
+      loadBaseData(),
+      loadRequests()
+    ]);
+  }, [loadBaseData, loadRequests]);
+
+  /**
+   * ORQUESTADOR DE PESTAÑAS
+   * Este efecto vigila que pestaña esta activa y carga sus datos automaticamente 
+   * si aun no los ha bajado, evitando peticiones redundantes.
+   */
   useEffect(() => {
     const fetchTabData = async () => {
       try {
@@ -245,7 +271,7 @@ export default function AdminScreen() {
           await Promise.all([loadBaseData(), loadReportData()]);
         }
       } catch (e) {
-        console.error("Error dispatching tab data:", e);
+        console.error("Error al orquestar carga de pestaña:", e);
       }
     };
     fetchTabData();

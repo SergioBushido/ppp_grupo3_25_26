@@ -158,6 +158,9 @@ export async function deleteEmployee(id, authUserId = null) {
   });
 
   if (error) throw error;
+  if (data?.error) {
+    throw new Error(data.details ? `${data.error} Detalles: ${data.details}` : data.error);
+  }
 
   if (data?.warning) {
     console.warn('Advertencia al eliminar empleado:', data.warning);
