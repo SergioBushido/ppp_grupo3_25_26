@@ -119,15 +119,15 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Solución aplicada:* Se implementó la migración `20260419113000_issue_35_admin_attendance_controls.sql` con columnas de auditoría y política `update` solo para admin; se añadió servicio `invalidateAttendanceByAdmin` con validación de “último fichaje activo del día”; se reforzó `attendanceService` con compatibilidad hacia atrás cuando `record_status` todavía no existe; y se estabilizó el monitor admin cargando fichajes recientes desde `attendances` sin depender del join embebido con `employees`, resolviendo el nombre del empleado desde el estado ya cargado en administración y aplicando el filtro de fecha en cliente. Con ello volvió a visualizarse el histórico y quedó operativa la anulación auditada.
   - *Criterios de aceptación:* Pendiente de validación manual tras aplicar migración. El admin puede anular el último fichaje activo del día con motivo obligatorio, el registro sigue visible como anulado en el monitor y el empleado vuelve a operar solo con los fichajes activos restantes.
 
-- [ ] **Issue #26 - Permitir registro manual de fichajes por administración**
+- [x] **Issue #26 - Permitir registro manual de fichajes por administración**
   - *Área:* Operativa y control horario.
   - *Severidad:* Media.
   - *Tipo:* Nueva funcionalidad.
   - *Impacto:* Completa el flujo `manual_only` permitiendo que el administrador registre entradas y salidas cuando el empleado no puede hacerlo desde la app.
   - *Objetivo:* Que el admin pueda crear manualmente un fichaje de entrada o salida desde el panel, con fecha/hora y motivo operativo opcional, respetando las reglas básicas de secuencia.
-  - *Módulos afectados:* `src/screens/AdminScreen.js`, `src/database/attendanceService.js`, tabla `attendances` y potencial ajuste de auditoría en SQL/RLS.
-  - *Propuesta técnica:* Añadir CTA de alta manual en el monitor admin, selector de empleado, tipo (`in`/`out`), fecha/hora editable y nota administrativa. Reutilizar la lógica de secuencia existente para impedir duplicados o jornadas incoherentes, y registrar que el fichaje fue creado por administración.
-  - *Criterios de aceptación:* El admin puede registrar manualmente una entrada o salida válida, el movimiento aparece inmediatamente en el monitor, queda identificado como creado por administración y convive correctamente con empleados `manual_only`.
+  - *Módulos afectados:* `src/screens/Admin/modals/ManualAttendanceModal.js`, `src/screens/Admin/tabs/AttendancesTab.js`, `src/screens/AdminScreen.js`, `src/database/attendanceService.js`, migración `20260419152000_issue_26_admin_manual_attendance.sql`.
+  - *Solución aplicada:* Implementado modal de registro manual con selector de empleado (con `check` visual), tipo entrada/salida, input de hora con validación en tiempo real, selector rápido de horas frecuentes (`08:00`, `09:00`…), nota administrativa con contador de caracteres y bloqueo del botón guardar hasta que los campos requeridos son válidos. Validaciones de secuencia (`in` antes de `out`, sin duplicados) gestionadas en `createManualAttendanceByAdmin`. El fichaje queda marcado con `entry_mode: 'admin_manual'` y muestra el badge "Creado por administración" en el monitor. También se corrigió el monitor (Audit M-01): ahora usa `getAllAttendancesByDate` en lugar de obtener 200 registros y filtrar en cliente.
+  - *Criterios de aceptación:* Cumplidos. El admin puede registrar manualmente una entrada o salida válida, el movimiento aparece inmediatamente en el monitor con badge de auditoría, la operación es bloqueada si la secuencia es inválida y convive correctamente con empleados `manual_only`.
 
 - [ ] **Tarea técnica - Estandarizar manejo de errores y reintento en cargas de pantallas**
   - *Área:* Bugs y errores.

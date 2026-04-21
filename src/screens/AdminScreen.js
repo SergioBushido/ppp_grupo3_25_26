@@ -20,7 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { getAllPendingVacations, approveVacation, rejectVacation, getAllVacations, requestVacation, cancelVacation, reactiveVacation, deleteVacation } from '../database/vacationService';
 import { getAllEmployees, updateEmployee, deleteEmployee, createEmployee, resetEmployeePassword } from '../database/employeeService';
 import { getShiftsByDate, createShift, deleteShift, deleteShiftsForEmployeeOnDate, getShiftsForMonth, getShiftsInRange, bulkCreateShifts, updateShift, getShiftsByEmployee } from '../database/shiftService';
-import { createManualAttendanceByAdmin, getRecentAttendances, invalidateAttendanceByAdmin } from '../database/attendanceService';
+import { createManualAttendanceByAdmin, getAllAttendancesByDate, invalidateAttendanceByAdmin } from '../database/attendanceService';
 import { createWorkCenter, deleteWorkCenter, getAllWorkCenters, updateWorkCenter } from '../database/workCenterService';
 
 // Local module
@@ -201,15 +201,13 @@ export default function AdminScreen() {
 
   const loadDayAttendances = useCallback(async () => {
     const dateStr = format(attendanceDate, 'yyyy-MM-dd');
-    const recentRecords = await getRecentAttendances(200);
-    let records = recentRecords.filter((record) => (
-      format(parseISO(record.timestamp), 'yyyy-MM-dd') === dateStr
-    ));
+    let records = [];
     let usedRecentFallback = false;
 
-    if (records.length === 0) {
-      records = recentRecords;
-      usedRecentFallback = records.length > 0;
+    try {
+      records = await getAllAttendancesByDate(attendanceDate);
+    } catch (e) {
+      console.error('Error loading day attendances:', e);
     }
 
     const activeRecords = [...records]
