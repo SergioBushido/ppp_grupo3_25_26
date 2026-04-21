@@ -209,11 +209,11 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Severidad:* Media.
   - *Criterio de aceptación:* Cumplido. Al borrar un empleado desde el panel, se eliminan el perfil, la cuenta Auth y el avatar. El email queda liberado para futuras altas.
 
-- [ ] **Issue #43 - Optimización de Carga de Datos en Panel Admin:**
-  - *Problema:* La carga inicial del panel Admin es lenta porque `loadAll` descarga todas las entidades (vacaciones, empleados, centros) en una sola llamada, independientemente de la pestaña activa.
-  - *Propuesta:* Implementar lazy loading por pestaña (solo cargar datos del tab activo), caché local con TTL para evitar re-fetches innecesarios y skeleton loaders para mejorar la percepción de velocidad.
+- [x] **Issue #43 - Optimización de Carga de Datos en Panel Admin (M-03):**
+  - *Solución aplicada:* Se eliminó la función monolítica `loadAll` y se implementó carga perezosa (`lazy loading`) por pestañas. La pantalla ahora maneja estados de carga individuales (`requestsLoading`, `shiftsLoading`, etc.) y solo descarga los datos relevantes cuando el usuario cambia a esa vista. Los datos base (empleados y centros) se cargan bajo demanda la primera vez y quedan en caché de estado. Se añadió un indicador global coordinado que respeta la pestaña activa.
   - *Severidad:* Media.
   - *Módulos afectados:* `src/screens/AdminScreen.js`.
+  - *Criterio de aceptación:* Cumplido. La app ya no descarga vacaciones ni turnos de forma preemptiva al entrar al panel de administración. La carga es progresiva mejorando significativamente el TTI inicial.
 
 #### 🟡 Mejora continua
 - [x] **Mejora interna - Ocultar credenciales demo en producción**
