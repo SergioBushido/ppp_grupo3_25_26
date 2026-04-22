@@ -228,7 +228,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción aplicada:* Eliminadas las credenciales demo visibles del login y sustituido el bloque informativo por una nota de autenticación segura.
   - *Criterio de aceptación:* Cumplido. La pantalla de login ya no muestra credenciales demo.
 
-- [ ] **Tarea técnica - Actualizar dependencias compatibles con Expo SDK actual**
+- [x] **Tarea técnica - Actualizar dependencias compatibles con Expo SDK actual**
   - *Área:* Arquitectura y escalabilidad.
   - *Severidad:* Baja.
   - *Tipo:* Deuda técnica.
@@ -278,3 +278,36 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 - [x] **Issue #8:** Asignación masiva de turnos mediante calendario interactivo.
 - [x] **Issue #13:** Selector táctil de vacaciones para empleados.
 - [x] **Migración a Supabase:** Sincronización en tiempo real finalizada.
+
+---
+
+## 📚 Anexo Técnico: Infraestructura de Pruebas (Issue #11)
+
+Durante la fase final de estabilización del proyecto, se ha implementado una suite automatizada de pruebas unitarias para garantizar la solidez de la lógica de negocio, logrando un **100% de cobertura (líneas y funciones)** en el módulo crítico `vacationService.js`.
+
+### 1. Descripción de las Pruebas Realizadas
+Se han diseñado casos de prueba exhaustivos que validan tanto las funciones de lectura (queries) como las transacciones y reglas de negocio:
+- **Gestión de Saldo (Reglas de Negocio):** Verificación de que la función `requestVacation` calcula correctamente la diferencia de días entre fechas y bloquea la operación lanzando una excepción controlada si el empleado no dispone de saldo suficiente.
+- **Transacciones CRUD:** Pruebas de éxito en la inserción de nuevas solicitudes cuando el saldo es válido.
+- **Invocación de Procedimientos Almacenados (RPCs):** Confirmación de que funciones como `approveVacation`, `cancelVacation` y `editRequestVacation` delegan de forma atómica su ejecución al backend mediante las llamadas `supabase.rpc()` correspondientes, incluyendo manejo de errores del servidor.
+- **Actualizaciones de Estado:** Validación de transiciones de estado (`pending`, `rejected`) mediante actualizaciones directas a la tabla.
+- **Lectura y Mapeo:** Validación de consultas complejas como `getAllVacations` y `getUpcomingVacationsForEmployee`, garantizando que se aplican correctamente los filtros (`eq`, `gte`, `limit`), las ordenaciones y la resolución de relaciones (joins) con la tabla de empleados.
+
+### 2. Problemas Encontrados y Soluciones
+
+- **Problema 1: Incompatibilidad de Jest con Expo SDK 54 (`ReferenceError: You are trying to import a file outside...`)**
+  - *Contexto:* Al intentar correr Jest por primera vez, el transpilador no conseguía procesar los módulos internos de `expo`, lanzando errores en `node_modules/expo/src/winter/runtime.native.ts`.
+  - *Causa:* Las dependencias `jest` y `jest-expo` instaladas inicialmente (`^30.x` y `^55.x`) eran demasiado modernas y rompían la compatibilidad con el entorno local basado en Expo SDK 54.
+  - *Solución:* Se forzó un *downgrade* coordinado ejecutando `npx expo install jest-expo jest`, lo que ancló las versiones a `jest@~29.7.0` y `jest-expo@~54.0.17`, alineándolas perfectamente con el SDK del proyecto y resolviendo la transpilación nativa.
+
+- **Problema 2: Fallo de Hoisting en Mocks Dinámicos (`TypeError: supabase.rpc is not a function`)**
+  - *Contexto:* Al simular las respuestas de la base de datos, los tests que utilizaban funciones RPC fallaban indicando que la función no existía en el mock.
+  - *Causa:* Las declaraciones de los espías (`jest.fn()`) se hacían en el ámbito global del archivo de test y luego se inyectaban en `jest.mock()`. Dado que Jest eleva (hoisting) los bloques `jest.mock` a la parte superior del archivo antes de ejecutar nada, las variables inyectadas resultaban ser `undefined`.
+  - *Solución:* Se refactorizó el bloque `jest.mock('../src/lib/supabase', ...)` instanciando los mocks (`mockChain`, `rpc`, etc.) **estrictamente dentro del factory callback**. Posteriormente, se requirió el objeto mockeado directamente desde el módulo simulado (`require('../src/lib/supabase')`) para hacer las aserciones, evitando así la colisión de ámbitos.
+
+- **Problema 3: Filtración de Archivos de Cobertura en Control de Versiones**
+  - *Contexto:* Al generar el reporte visual HTML, la carpeta generada (`coverage/`) fue rastreada accidentalmente por Git, añadiendo miles de líneas de ruido al repositorio.
+  - *Solución:* Se purgó la carpeta del caché de Git (`git rm -r --cached coverage/`), se eliminó físicamente y se añadió la directiva `coverage/` al archivo `.gitignore` para prevenir futuras intrusiones.
+
+### 3. Conclusión
+La implementación de la suite de pruebas ha dotado a **TransferLog** de un estándar de calidad profesional. El motor de mocks `mockChain` diseñado durante esta fase es altamente reutilizable, lo que permitirá a futuros desarrolladores extender la cobertura a otros servicios (como `attendanceService` o `shiftService`) con mínimo esfuerzo y máxima fiabilidad.
