@@ -55,9 +55,16 @@ export default function VacationsScreen({ navigation }) {
           text: 'Cancelar solicitud',
           style: 'destructive',
           onPress: async () => {
-            await deleteVacation(vacationId);
-            await loadVacations();
-            await refreshUser();
+            try {
+              setLoading(true);
+              await deleteVacation(vacationId);
+              await loadVacations();
+              await refreshUser();
+            } catch (error) {
+              console.error('[Vacations] Error al cancelar solicitud:', error);
+              Alert.alert('Error', 'No se pudo cancelar la solicitud de vacaciones. Inténtalo de nuevo.');
+              setLoading(false);
+            }
           },
         },
       ]

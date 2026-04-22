@@ -1,0 +1,6 @@
+{
+  "**/.env*": [
+    "echo \"[ERROR] Se ha detectado un archivo .env en el stage. Operación cancelada por seguridad.\"",
+    "exit 1"
+  ]
+}

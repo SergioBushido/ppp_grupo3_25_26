@@ -78,6 +78,7 @@ export default function CalendarScreen({ navigation }) {
       }
     } catch (e) {
       console.error('[Calendar] Error al cargar datos:', e);
+      Alert.alert('Error', 'No se pudieron cargar los datos del calendario. Por favor, verifica tu conexión e inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }
