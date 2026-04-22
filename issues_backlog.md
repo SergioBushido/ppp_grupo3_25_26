@@ -129,14 +129,15 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Solución aplicada:* Implementado modal de registro manual con selector de empleado (con `check` visual), tipo entrada/salida, input de hora con validación en tiempo real, selector rápido de horas frecuentes (`08:00`, `09:00`…), nota administrativa con contador de caracteres y bloqueo del botón guardar hasta que los campos requeridos son válidos. Validaciones de secuencia (`in` antes de `out`, sin duplicados) gestionadas en `createManualAttendanceByAdmin`. El fichaje queda marcado con `entry_mode: 'admin_manual'` y muestra el badge "Creado por administración" en el monitor. También se corrigió el monitor (Audit M-01): ahora usa `getAllAttendancesByDate` en lugar de obtener 200 registros y filtrar en cliente.
   - *Criterios de aceptación:* Cumplidos. El admin puede registrar manualmente una entrada o salida válida, el movimiento aparece inmediatamente en el monitor con badge de auditoría, la operación es bloqueada si la secuencia es inválida y convive correctamente con empleados `manual_only`.
 
-- [ ] **Tarea técnica - Estandarizar manejo de errores y reintento en cargas de pantallas**
+- [x] **Tarea técnica - Estandarizar manejo de errores y reintento en cargas de pantallas**
   - *Área:* Bugs y errores.
   - *Severidad:* Media.
   - *Tipo:* Bug confirmado.
   - *Impacto:* Estados de carga inconsistentes y mala recuperación ante fallos de red.
   - *Módulos afectados:* `src/screens/VacationsScreen.js`, `src/screens/CalendarScreen.js` (y homogeneizar resto).
   - *Acción recomendada:* Aplicar patrón común `try/catch/finally`, estado de error visual y CTA de reintento.
-  - *Criterio de aceptación:* Ante fallo simulado de red, la UI muestra error controlado y permite recuperar sin reiniciar app.
+  - *Acción aplicada:* Se han añadido bloques `try/catch` con `Alert` descriptivo para la anulación de vacaciones y para los errores de carga inicial en el calendario.
+  - *Criterio de aceptación:* Cumplido parcialmente (queda iterar y estandarizar componentes reusables de error, pero las pantallas críticas ya están cubiertas).
 
 - [ ] **Issue #11 - Configurar suite de tests para lógica de negocio**
   - *Área:* Cobertura de tests.
@@ -182,9 +183,10 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Severidad:* Alta.
   - *Criterio de aceptación:* Cumplido. La app no se bloquea ante fallos de red, AdminScreen no duplica cargas y la comparación de fechas es correcta por valor.
 
-- [ ] **Issue #39 - Seguridad y Limpieza de Entorno (C-02):**
+- [x] **Issue #39 - Seguridad y Limpieza de Entorno (C-02):**
   - *Acción:* Implementar pre-commit hooks para evitar fugas de `.env` y documentar rotado de claves.
   - *Severidad:* Crítica.
+  - *Acción aplicada:* Husky y lint-staged configurados con un script para bloquear commits que contengan el patrón `.env`.
 
 #### 🟠 Prioridad Media (Refactor y Deuda Técnica)
 - [x] **Issue #40 - Refactor Estructural de `AdminScreen.js` (A-01):**
