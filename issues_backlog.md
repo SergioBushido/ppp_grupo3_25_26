@@ -8,7 +8,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
 
 
 
-- [ ] **Issue #11 - Suite de Pruebas:** 
+- [x] **Issue #11 - Suite de Pruebas:** 
   - *Descripción:* Configurar Jest y realizar tests de lógica de negocio.
   - *Prioridad:* Media.
 
