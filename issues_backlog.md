@@ -107,7 +107,7 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Criterios de aceptación:* Cumplidos tras validación manual. Se verificó el comportamiento esperado en `manual_only` y el monitor admin recuperó visibilidad correcta del histórico con evidencia de ubicación; la operativa de geolocalización y trazabilidad queda aceptada para esta iteración.
   - *Cierre técnico:* Se da por concluida la issue en cliente. Como mejora futura no bloqueante, sigue siendo razonable estudiar una consolidación backend/RPC de la validación de fichaje cuando el ciclo de despliegue SQL sea más estable.
 
-- [ ] **Issue #35 - Permitir anulación auditada de fichajes desde administración**
+- [x] **Issue #35 - Permitir anulación auditada de fichajes desde administración**
   - *Área:* Operativa y control horario.
   - *Severidad:* Media.
   - *Tipo:* Nueva funcionalidad.
