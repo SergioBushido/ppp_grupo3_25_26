@@ -432,8 +432,8 @@ export default function CalendarScreen({ navigation }) {
             <View style={styles.shiftOptionsList}>
               {[
                 { type: 'morning', label: 'Mañana', icon: 'weather-sunny' },
-                { type: 'afternoon', label: 'Tarde', icon: 'wrench' },
-                { type: 'night', label: 'Noche', icon: 'wrench' },
+                { type: 'afternoon', label: 'Tarde', icon: 'weather-sunset' },
+                { type: 'night', label: 'Noche', icon: 'weather-night' },
               ].map((opt) => (
                 <TouchableOpacity
                   key={opt.type}

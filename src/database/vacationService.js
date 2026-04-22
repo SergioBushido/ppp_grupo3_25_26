@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { getLocalDateString } from '../lib/dateService';
 
 export async function getVacationsByEmployee(employeeId) {
   const { data, error } = await supabase
@@ -54,7 +55,7 @@ export async function getAllPendingVacations() {
 }
 
 export async function getUpcomingVacationsForEmployee(employeeId) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
   const { data, error } = await supabase
     .from('vacations')
     .select('*')
