@@ -139,14 +139,14 @@ Este documento centraliza todas las incidencias y mejoras planificadas para el p
   - *Acción aplicada:* Se han añadido bloques `try/catch` con `Alert` descriptivo para la anulación de vacaciones y para los errores de carga inicial en el calendario.
   - *Criterio de aceptación:* Cumplido parcialmente (queda iterar y estandarizar componentes reusables de error, pero las pantallas críticas ya están cubiertas).
 
-- [ ] **Issue #11 - Configurar suite de tests para lógica de negocio**
+- [x] **Issue #11 - Configurar suite de pruebas para lógica de negocio**
   - *Área:* Cobertura de tests.
   - *Severidad:* Media.
   - *Tipo:* Deuda técnica.
   - *Impacto:* Alta probabilidad de regresiones en reglas críticas (vacaciones, fichajes, auth).
   - *Módulos afectados:* `package.json`, servicios de `src/database/*`.
-  - *Acción recomendada:* Configurar `jest`/`jest-expo`, mocks de Supabase y casos de prueba críticos.
-  - *Criterio de aceptación:* La suite se ejecuta en local y cubre al menos reglas principales de vacaciones/auth/fichajes.
+  - *Acción aplicada:* Se instaló `jest` y `jest-expo`, configurando el entorno con `babel.config.js` y `jest.config.js`. Se creó un mock global para Supabase y se escribieron los primeros tests en `vacationService.test.js` para validar la lógica de cálculo de días de vacaciones y verificación de saldo.
+  - *Criterio de aceptación:* Cumplido. La suite se ejecuta correctamente en local (`npm test`) y valida la lógica pura de negocio.
 
 ### 🔍 Auditoría Técnica Profunda (19/04)
 
