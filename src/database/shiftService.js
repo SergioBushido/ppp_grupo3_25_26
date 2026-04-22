@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getLocalDateString } from '../lib/dateService';
 
 export const SHIFT_TEMPLATES = {
   morning: { start_time: '08:00', end_time: '16:00' },
@@ -67,7 +68,7 @@ export async function getShiftsByDate(date) {
 }
 
 export async function getTodayShiftForEmployee(employeeId) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
   const { data, error } = await supabase
     .from('shifts')
     .select('*')

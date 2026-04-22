@@ -64,6 +64,7 @@ export default function AdminScreen() {
   const [shiftsLoading, setShiftsLoading] = useState(false);
   const [attendancesLoading, setAttendancesLoading] = useState(false);
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Helper para centralizar la logica de si la pantalla "esta cargando".
   // Devuelve true si la pestaña activa necesita datos que aun se estan bajando.
@@ -71,10 +72,10 @@ export default function AdminScreen() {
     if (exportandoPDF) return true;
     switch (activeTab) {
       case 'requests': return requestsLoading;
-      case 'shifts': return shiftsLoading || baseDataLoading;
+      case 'shifts': return loading || shiftsLoading || baseDataLoading;
       case 'attendances': return attendancesLoading || baseDataLoading;
-      case 'employees': return baseDataLoading;
-      case 'reports': return reportsLoading || baseDataLoading;
+      case 'employees': return loading || baseDataLoading;
+      case 'reports': return loading || reportsLoading || baseDataLoading;
       default: return false;
     }
   };
