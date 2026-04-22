@@ -64,12 +64,12 @@ export default function AdminScreen() {
   const [shiftsLoading, setShiftsLoading] = useState(false);
   const [attendancesLoading, setAttendancesLoading] = useState(false);
   const [reportsLoading, setReportsLoading] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Estado global para acciones de guardado/borrado
 
   // Helper para centralizar la logica de si la pantalla "esta cargando".
   // Devuelve true si la pestaña activa necesita datos que aun se estan bajando.
   const isActiveTabLoading = () => {
-    if (exportandoPDF) return true;
+    if (exportandoPDF || loading) return true;
     switch (activeTab) {
       case 'requests': return requestsLoading;
       case 'shifts': return loading || shiftsLoading || baseDataLoading;

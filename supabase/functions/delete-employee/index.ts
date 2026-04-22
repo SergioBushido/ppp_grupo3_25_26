@@ -53,6 +53,8 @@ Deno.serve(async (request) => {
      * Por ello, desplegamos sin verificacion automatica y realizamos la validacion manual
      * aqui dentro usando 'getUser()', que SI soporta ES256.
      */
+    const authHeader = request.headers.get('Authorization');
+
     const requesterClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });

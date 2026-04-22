@@ -25,9 +25,11 @@
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
-      ]
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.sferji.ppp_grupo3"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -45,6 +47,11 @@
           "locationWhenInUsePermission": "TransferLog necesita tu ubicacion para validar el fichaje cuando tu politica requiera estar dentro del radio de un centro."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "fff33ce5-0ddd-4c71-90dc-7a519742472c"
+      }
+    }
   }
 }
